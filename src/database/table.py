@@ -326,65 +326,78 @@ class Table:
         else:
             raise ValueError(f"Unsupported data type: {col_type}")
 
-    def serialize_column(self, column, value):
+    def serialize_column(self, col_type, value):
         """
         Serialize a column value based on its data type.
         
         Params:
-            column (str): The name of the column.
+            col_type (str): The data type of the column.
             value: The value to serialize.
         
         Returns:
             bytes: The serialized value as bytes.
         """
-        if column not in self.columns:
-            raise ValueError(f"Column {column} not found in table {self.name}")
-        
-        col_type = self.columns[column]
-        fmt = self._get_single_data_pack_string(col_type)
-        
-        if 's' in fmt:
-            size = int(fmt[:-1])
-            encoded = value.encode('utf-8')
-            if len(encoded) > size:
-                raise ValueError(f"Value for {column} exceeds VARCHAR({size}) limit")
-            return encoded.ljust(size, b'\x00')
-        else:
-            return struct.pack(fmt, value)
+        try:
+            if col_type == "INT":
+                return struct.pack('!i', value)
+            elif col_type == "FLOAT":
+                return struct.pack('!d', value)
+            elif col_type == "BOOLEAN":
+                return struct.pack('!?', value)
+            elif col_type == "DATE":
+                return struct.pack('!q', value)
+            elif col_type.startswith("VARCHAR"):
+                size = int(col_type.split("(")[1].split(")")[0])
+                encoded = value.encode('utf-8')
+                if len(encoded) > size:
+                    encoded = encoded[:size]
+                return encoded.ljust(size, b'\x00')
+            else:
+                fmt = self._get_single_data_pack_string(col_type)
+                return struct.pack(fmt, value)
+        except Exception as e:
+            # Fallback to original method as a last resort
+            fmt = self._get_single_data_pack_string(col_type)
+            if 's' in fmt:
+                size = int(fmt[:-1])
+                encoded = value.encode('utf-8')
+                if len(encoded) > size:
+                    raise ValueError(f"Value for {column} exceeds VARCHAR({size}) limit")
+                return encoded.ljust(size, b'\x00')
+            else:
+                return struct.pack(fmt, value)
     
-    def deserialize_column(self, column, bytes_data):
+    def deserialize_column(self, col_type, bytes_data):
         """
         Deserialize a column value from bytes based on its data type.
         
         Params:
-            column (str): The name of the column.
+            col_type (str): The data type of the column.
             bytes_data (bytes): The serialized value as bytes.
         
         Returns:
             The deserialized value.
         """
-        if column not in self.columns:
-            raise ValueError(f"Column {column} not found in table {self.name}")
         
-        col_type = self.columns[column]
-        fmt = self._get_single_data_pack_string(col_type)
-        
-        if 's' in fmt:
-            size = int(fmt[:-1])
-            return bytes_data[:size].decode('utf-8').rstrip('\x00')
-        else:
-            return struct.unpack(fmt, bytes_data)[0]
-
-if __name__ == "__main__":
-    # Example usage
-    table = Table(name="example_table", columns={"id": "INT", "name": "VARCHAR(100)"}, primary_key="id", page_size=4096) # page_size of 4096 
-    print(table.get_column_names())
-    print(table.get_column_info())
-    print(table.get_record_count())
-    print(table.pack_string)
-
-    table2 = Table.from_table_name("example_table", page_size=4096)
-    print(table2.get_column_names())
-    print(table2.get_column_info())
-    print(table2.get_record_count())
-    print(table2.pack_string)
+        try:
+            if col_type == "INT":
+                return struct.unpack('!i', bytes_data)[0]
+            elif col_type == "FLOAT":
+                return struct.unpack('!d', bytes_data)[0]
+            elif col_type == "BOOLEAN":
+                return bool(struct.unpack('!?', bytes_data)[0])
+            elif col_type == "DATE":
+                return struct.unpack('!q', bytes_data)[0]
+            elif col_type.startswith("VARCHAR"):
+                return bytes_data.decode('utf-8').rstrip('\x00')
+            else:
+                fmt = self._get_single_data_pack_string(col_type)
+                return struct.unpack(fmt, bytes_data)[0]
+        except Exception as e:
+            # Fallback to original method as a last resort
+            fmt = self._get_single_data_pack_string(col_type)
+            if 's' in fmt:
+                size = int(fmt[:-1])
+                return bytes_data[:size].decode('utf-8').rstrip('\x00')
+            else:
+                return struct.unpack(fmt, bytes_data)[0]

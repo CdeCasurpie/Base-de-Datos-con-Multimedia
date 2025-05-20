@@ -8,6 +8,6 @@
     },
     "index_type": "bplus_tree",
     "primary_key": "id",
-    "record_count": 0,
+    "record_count": 541,
     "pack_string": "i30sid"
 }

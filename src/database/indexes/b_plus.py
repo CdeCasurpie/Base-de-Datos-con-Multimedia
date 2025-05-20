@@ -188,43 +188,13 @@ class BPlusTree(IndexBase):
             f.write(page_data)
     
     def _serialize_key(self, key):
-        try:
-            if self.col_type == "INT":
-                return struct.pack('!i', key)
-            elif self.col_type == "FLOAT":
-                return struct.pack('!d', key)
-            elif self.col_type == "BOOLEAN":
-                return struct.pack('!?', key)
-            elif self.col_type == "DATE":
-                return struct.pack('!q', key)
-            elif self.col_type.startswith("VARCHAR"):
-                size = int(self.col_type.split("(")[1].split(")")[0])
-                encoded = key.encode('utf-8')
-                if len(encoded) > size:
-                    encoded = encoded[:size]
-                return encoded.ljust(size, b'\x00')
-            else:
-                return self.table_ref.serialize_column(self.column_name, key)
-        except Exception as e:
-            return self.table_ref.serialize_column(self.column_name, key)
+        """Serializa la clave usando la lógica centralizada en Table"""
+        return self.table_ref.serialize_column(self.col_type, key)
     
     def _deserialize_key(self, key_bytes):
-        try:
-            if self.col_type == "INT":
-                return struct.unpack('!i', key_bytes)[0]
-            elif self.col_type == "FLOAT":
-                return struct.unpack('!d', key_bytes)[0]
-            elif self.col_type == "BOOLEAN":
-                return bool(struct.unpack('!?', key_bytes)[0])
-            elif self.col_type == "DATE":
-                return struct.unpack('!q', key_bytes)[0]
-            elif self.col_type.startswith("VARCHAR"):
-                return key_bytes.decode('utf-8').rstrip('\x00')
-            else:
-                return self.table_ref.deserialize_column(self.column_name, key_bytes)
-        except Exception as e:
-            return self.table_ref.deserialize_column(self.column_name, key_bytes)
-    
+        """Deserializa la clave usando la lógica centralizada en Table"""
+        return self.table_ref.deserialize_column(self.col_type, key_bytes)
+
     def _find_leaf(self, key):
         """Encuentra el nodo hoja que debería contener la clave"""
         if self.root_page_id is None:
