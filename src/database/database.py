@@ -1,6 +1,6 @@
 import os
 import json
-from .table import Table
+from table import Table
 
 class Database:
     def __init__(self, data_dir="./data"):

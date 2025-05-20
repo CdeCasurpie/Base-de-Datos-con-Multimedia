@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 import os
-from database.table import Table
 
 class IndexBase(ABC):
     """ 
@@ -56,11 +55,12 @@ class IndexBase(ABC):
         pass
     
     @abstractmethod
-    def add(self, key):
+    def add(self, record, key):
         """
         Add a record to the index
         
         Params:
+            record: The record to add
             key: The key to index
         """
         pass

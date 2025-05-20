@@ -1,0 +1,13 @@
+{
+    "name": "test_btree",
+    "columns": {
+        "id": "INT",
+        "name": "VARCHAR(30)",
+        "age": "INT",
+        "score": "FLOAT"
+    },
+    "index_type": "bplus_tree",
+    "primary_key": "id",
+    "record_count": 0,
+    "pack_string": "i30sid"
+}
