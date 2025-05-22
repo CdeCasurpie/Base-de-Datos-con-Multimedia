@@ -77,6 +77,7 @@ class BPlusTree(IndexBase):
             root.page_id = self._allocate_page()
             self.root_page_id = root.page_id
             self.height = 1
+            self.free_pages = []
             
             self._write_node(root)
             self._save_metadata()
@@ -89,8 +90,10 @@ class BPlusTree(IndexBase):
         self.order = metadata.get('order')
         self.height = metadata.get('height', 1)
         self.num_pages = metadata.get('num_pages', 0)
+        self.free_pages = metadata.get('free_pages', [])
     
     def _save_metadata(self):
+        """Guarda metadatos del índice, incluyendo la lista de páginas libres"""
         metadata = {
             'table_name': self.table_name,
             'column_name': self.column_name,
@@ -98,15 +101,26 @@ class BPlusTree(IndexBase):
             'order': self.order,
             'height': self.height,
             'num_pages': self.num_pages,
+            'free_pages': self.free_pages
         }
         
         with open(self.metadata_file, 'w') as f:
             json.dump(metadata, f, indent=4)
     
     def _allocate_page(self):
-        page_id = self.num_pages
-        self.num_pages += 1
-        return page_id
+        """
+        Asigna una página para un nuevo nodo.
+        Primero intenta usar una página libre; si no hay, crea una nueva.
+        
+        Returns:
+            int: ID de la página asignada
+        """
+        if hasattr(self, 'free_pages') and self.free_pages:
+            return self.free_pages.pop()
+        else:
+            page_id = self.num_pages
+            self.num_pages += 1
+            return page_id
     
     def _read_node(self, page_id):
         """Lee un nodo desde disco dado su ID de página"""
@@ -201,7 +215,6 @@ class BPlusTree(IndexBase):
             return None
             
         current_node = self._read_node(self.root_page_id)
-        
         while not current_node.is_leaf:
             i = 0
             while i < len(current_node.keys) and key >= current_node.keys[i]:
@@ -289,176 +302,392 @@ class BPlusTree(IndexBase):
             self.root_page_id = root.page_id
             return
         
-        leaf = self._find_leaf(key)
+        new_key, new_node = self._insert_recursive(self.root_page_id, key, record_pos)
         
-        i = 0
-        while i < len(leaf.keys) and key > leaf.keys[i]:
-            i += 1
-        
-        # Si la clave ya existe, reemplazar la posición
-        if i < len(leaf.keys) and key == leaf.keys[i]:
-            leaf.children[i] = record_pos
-            self._write_node(leaf)
-            return
-        
-        # Insertar nueva clave y posición
-        leaf.keys.insert(i, key)
-        leaf.children.insert(i, record_pos)
-        
-        # Verificar si se necesita división
-        if len(leaf.keys) < self.order:
-            self._write_node(leaf)
-            return
-        
-        self._split_leaf(leaf)
+        if new_key is not None:
+            new_root = Node(is_leaf=False)
+            new_root.page_id = self._allocate_page()
+            new_root.keys.append(new_key)
+            new_root.children.append(self.root_page_id)
+            new_root.children.append(new_node.page_id)
+            
+            self._write_node(new_root)
+            self.root_page_id = new_root.page_id
+            self.height += 1
     
-    def _split_leaf(self, leaf):
-        """Divide un nodo hoja y actualiza la estructura del árbol"""
+    def _insert_recursive(self, node_id, key, record_pos):
+        """
+        Inserta recursivamente una clave en el árbol.
+        
+        Args:
+            node_id: ID del nodo actual
+            key: Clave a insertar
+            record_pos: Posición del registro
+            
+        Returns:
+            tuple: (clave_promovida, nuevo_nodo) o (None, None) si no hay promoción
+        """
+        node = self._read_node(node_id)
+        
+        # Si es un nodo hoja
+        if node.is_leaf:
+            i = 0
+            while i < len(node.keys) and key > node.keys[i]:
+                i += 1
+            
+            if i < len(node.keys) and key == node.keys[i]:
+                node.children[i] = record_pos
+                self._write_node(node)
+                return None, None
+            
+            node.keys.insert(i, key)
+            node.children.insert(i, record_pos)
+            
+            # División
+            if len(node.keys) < self.order:
+                self._write_node(node)
+                return None, None
+            
+            return self._split_leaf_recursive(node)
+        
+        # Si es un nodo interno
+        else:
+            # Encontrar el hijo
+            i = 0
+            while i < len(node.keys) and key >= node.keys[i]:
+                i += 1
+            
+            child_id = node.children[i]
+            new_key, new_node = self._insert_recursive(child_id, key, record_pos)
+            
+            if new_key is None:
+                return None, None
+            
+            i = 0
+            while i < len(node.keys) and new_key > node.keys[i]:
+                i += 1
+            
+            node.keys.insert(i, new_key)
+            node.children.insert(i + 1, new_node.page_id)
+            
+            # Si necesitamos split:
+            if len(node.keys) < self.order:
+                self._write_node(node)
+                return None, None
+            
+            return self._split_internal_recursive(node)
+    
+    def _split_leaf_recursive(self, leaf):
+        """
+        Divide un nodo hoja y devuelve la información para actualización del padre.
+        
+        Returns:
+            tuple: (clave_promovida, nuevo_nodo)
+        """
         new_leaf = Node(is_leaf=True)
         new_leaf.page_id = self._allocate_page()
         
-        # Calcular punto de división
         split = len(leaf.keys) // 2
         
-        # Mover mitad de claves e hijos al nuevo nodo
+
         new_leaf.keys = leaf.keys[split:]
         new_leaf.children = leaf.children[split:]
         
-        # Actualizar el nodo original
+
         leaf.keys = leaf.keys[:split]
         leaf.children = leaf.children[:split]
         
-        # Configurar cadena de hojas
         new_leaf.next_leaf = leaf.next_leaf
         leaf.next_leaf = new_leaf.page_id
         
-        # Obtener primera clave del nuevo nodo para promoción
-        promoted_key = new_leaf.keys[0]
-        
-        # Escribir ambas hojas al disco
         self._write_node(leaf)
         self._write_node(new_leaf)
         
-        # Añadir clave promovida al padre
-        self._insert_in_parent(leaf, promoted_key, new_leaf)
+        return new_leaf.keys[0], new_leaf
     
-    def _insert_in_parent(self, left_node, key, right_node):
-        """Inserta una clave y hijo derecho en el nodo padre"""
-        # Caso especial: si el nodo izquierdo es la raíz
-        if left_node.page_id == self.root_page_id:
-            new_root = Node(is_leaf=False)
-            new_root.page_id = self._allocate_page()
-            new_root.keys.append(key)
-            new_root.children.append(left_node.page_id)
-            new_root.children.append(right_node.page_id)
-            
-            self.root_page_id = new_root.page_id
-            self.height += 1
-            
-            self._write_node(new_root)
-            return
+    def _split_internal_recursive(self, node):
+        """
+        Divide un nodo interno y devuelve la información para actualización del padre.
         
-        parent = self._find_parent(self.root_page_id, left_node.page_id)
-        
-        i = 0
-        while i < len(parent.keys) and key > parent.keys[i]:
-            i += 1
-        
-        parent.keys.insert(i, key)
-        parent.children.insert(i + 1, right_node.page_id)
-        
-        # Verificar si el padre necesita división
-        if len(parent.keys) < self.order:
-            self._write_node(parent)
-            return
-        
-        self._split_internal(parent)
-    
-    def _split_internal(self, node):
-        """Divide un nodo interno y actualiza la estructura"""
+        Returns:
+            tuple: (clave_promovida, nuevo_nodo)
+        """
         new_node = Node(is_leaf=False)
         new_node.page_id = self._allocate_page()
         
+
         split = len(node.keys) // 2
         
-        # Obtener clave media para promoción
         promoted_key = node.keys[split]
         
-        # Mover claves e hijos al nuevo nodo
         new_node.keys = node.keys[split+1:]
         new_node.children = node.children[split+1:]
         
-        # Actualizar el nodo original
         node.keys = node.keys[:split]
         node.children = node.children[:split+1]
         
-        # Escribir ambos nodos a disco
         self._write_node(node)
         self._write_node(new_node)
         
-        # Añadir clave promovida al padre
-        self._insert_in_parent(node, promoted_key, new_node)
-    
-    def _find_parent(self, node_id, child_id):
-        """Encuentra el nodo padre de un nodo hijo dado"""
-        node = self._read_node(node_id)
-        
-        if node.is_leaf:
-            return None
-        
-        # Verificar si alguno de los hijos es el objetivo
-        for i, child in enumerate(node.children):
-            if child == child_id:
-                return node
-        
-        # Buscar recursivamente en el hijo apropiado
-        for i, key in enumerate(node.keys):
-            i_child = self._read_node(node.children[i])
-            if i_child.is_leaf:
-                continue
-                
-            if i == len(node.keys) - 1:
-                i_plus_child = self._read_node(node.children[i+1])
-                if not i_plus_child.is_leaf:
-                    right_result = self._find_parent(node.children[i+1], child_id)
-                    if right_result:
-                        return right_result
-            
-            result = self._find_parent(node.children[i], child_id)
-            if result:
-                return result
-        
-        return None
+        return promoted_key, new_node
     
     def remove(self, key):
-        """Elimina un registro con la clave dada"""
+        """
+        Elimina un registro con la clave dada de forma recursiva.
+        
+        Args:
+            key: Clave a eliminar
+            
+        Returns:
+            bool: True si se eliminó correctamente, False si no se encontró
+        """
         if self.root_page_id is None:
             return False
+        
+        result, underflow = self._remove_recursive(self.root_page_id, key)
+        # Si raiz vaciá
+        if underflow:
+            root = self._read_node(self.root_page_id)
+            if not root.is_leaf and len(root.keys) == 0:
+                new_root_id = root.children[0]
+                self.root_page_id = new_root_id
+                self.height -= 1
+                # Liberar la página de la antigua raíz (opcional)
+        
+        self._save_metadata()
+        return result
+        
+    def _remove_recursive(self, node_id, key):
+        """
+        Elimina recursivamente una clave del árbol B+.
+        
+        Args:
+            node_id: ID del nodo actual
+            key: Clave a eliminar
             
-        leaf = self._find_leaf(key)
-        if leaf is None:
-            return False
-        
-        found = False
-        for i, k in enumerate(leaf.keys):
-            if k == key:
-                leaf.keys.pop(i)
-                leaf.children.pop(i)
-                found = True
-                break
-        
-        if not found:
-            return False
-        
-        self._write_node(leaf)
-        
-        # Verificar si necesitamos manejar underflow
+        Returns:
+            tuple: (éxito, underflow) donde éxito indica si se eliminó la clave
+                  y underflow indica si el nodo quedó con menos claves de las permitidas
+        """
+        node = self._read_node(node_id)
         min_keys = (self.order - 1) // 2
-        if len(leaf.keys) >= min_keys or leaf.page_id == self.root_page_id:
-            return True
         
-        # Versión simplificada - una versión completa necesitaría lógica más compleja
-        return True
+        # Si es un nodo hoja
+        if node.is_leaf:
+            # Buscar la clave
+            i = 0
+            while i < len(node.keys) and key != node.keys[i]:
+                i += 1
+                
+            if i == len(node.keys):
+                return False, False
+            
+            record_pos_to_delete = node.children[i]
+            
+            # last pos
+            file_size = os.path.getsize(self.data_path)
+            record_size = self.table_ref._get_record_size()
+            last_record_pos = file_size - record_size
+            
+            # Reemplazar el registro a eliminar
+            if record_pos_to_delete != last_record_pos:
+                with open(self.data_path, 'rb') as f:
+                    f.seek(last_record_pos)
+                    last_record_data = f.read(record_size)
+                    last_record = self.table_ref._deserialize_record(last_record_data)
+                    last_key = last_record[self.column_name]
+                
+                with open(self.data_path, 'r+b') as f:
+                    f.seek(record_pos_to_delete)
+                    f.write(last_record_data)
+                
+                # Encontrar el nodo hoja
+                last_leaf = self._find_leaf(last_key)
+                if last_leaf is not None and last_leaf.page_id != node.page_id:
+                    j = 0
+                    while j < len(last_leaf.keys):
+                        if last_leaf.keys[j] == last_key and last_leaf.children[j] == last_record_pos:
+                            last_leaf.children[j] = record_pos_to_delete
+                            self._write_node(last_leaf)
+                            break
+                        j += 1
+                    # truncar 
+                    with open(self.data_path, 'ab') as f:
+                        f.truncate(last_record_pos)
+            
+            node.keys.pop(i)
+            node.children.pop(i)
+            
+            self._write_node(node)
+            
+            # underflow??
+            underflow = len(node.keys) < min_keys and node.page_id != self.root_page_id
+            return True, underflow
+            
+        # Si es un nodo interno
+        else:
+            i = 0
+            while i < len(node.keys) and key >= node.keys[i]:
+                i += 1
+            child_id = node.children[i]
+            success, child_underflow = self._remove_recursive(child_id, key)
+            
+            if not success:
+                return False, False
+                
+            if not child_underflow:
+                return True, False
+            child = self._read_node(child_id)
+            return self._handle_underflow(node, child, i)
+    
+    def _handle_underflow(self, parent, child, child_index):
+        """
+        Maneja el underflow de un nodo hijo.
+        
+        Args:
+            parent: Nodo padre
+            child: Nodo hijo con underflow
+            child_index: Índice del hijo en el padre
+            
+        Returns:
+            tuple: (éxito, underflow_propagado) 
+        """
+        min_keys = (self.order - 1) // 2
+        
+        # Intentar pedir prestado del hermano izquierdo
+        if child_index > 0:
+            left_sibling_id = parent.children[child_index - 1]
+            left_sibling = self._read_node(left_sibling_id)
+            
+            if len(left_sibling.keys) > min_keys:
+                return self._redistribute_right(parent, left_sibling, child, child_index - 1)
+        
+        # Intentar pedir prestado del hermano derecho
+        if child_index < len(parent.children) - 1:
+            right_sibling_id = parent.children[child_index + 1]
+            right_sibling = self._read_node(right_sibling_id)
+            
+            if len(right_sibling.keys) > min_keys:
+                return self._redistribute_left(parent, child, right_sibling, child_index)
+        
+        # Fusionar
+        if child_index > 0:
+            left_sibling_id = parent.children[child_index - 1]
+            left_sibling = self._read_node(left_sibling_id)
+            return self._merge_nodes(parent, left_sibling, child, child_index - 1)
+        else:
+            right_sibling_id = parent.children[child_index + 1]
+            right_sibling = self._read_node(right_sibling_id)
+            return self._merge_nodes(parent, child, right_sibling, child_index)
+    
+    def _redistribute_right(self, parent, left, right, key_index):
+        """
+        Redistribuye claves: mueve una clave del hermano izquierdo al derecho.
+        
+        Args:
+            parent: Nodo padre
+            left: Hermano izquierdo
+            right: Hermano derecho (con underflow)
+            key_index: Índice de la clave del padre entre ambos nodos
+            
+        Returns:
+            tuple: (True, False) - Éxito y no hay underflow propagado
+        """
+        # Para nodos hoja
+        if left.is_leaf:
+            key = left.keys.pop()
+            ptr = left.children.pop()
+            
+            right.keys.insert(0, key)
+            right.children.insert(0, ptr)
+            
+            parent.keys[key_index] = right.keys[0]
+        else:
+            # Para nodos internos
+            right.keys.insert(0, parent.keys[key_index])
+            parent.keys[key_index] = left.keys.pop()
+
+            ptr = left.children.pop()
+            right.children.insert(0, ptr)
+        
+        self._write_node(parent)
+        self._write_node(left)
+        self._write_node(right)
+        
+        return True, False
+        
+    def _redistribute_left(self, parent, left, right, key_index):
+        """
+        Redistribuye claves: mueve una clave del hermano derecho al izquierdo.
+        
+        Args:
+            parent: Nodo padre
+            left: Hermano izquierdo (con underflow)
+            right: Hermano derecho
+            key_index: Índice de la clave del padre entre ambos nodos
+            
+        Returns:
+            tuple: (True, False) - Éxito y no hay underflow propagado
+        """
+        # Para nodos hoja
+        if left.is_leaf:
+            key = right.keys.pop(0)
+            ptr = right.children.pop(0)
+            
+            left.keys.append(key)
+            left.children.append(ptr)
+            
+            parent.keys[key_index] = right.keys[0]
+        else:
+            # Para nodos internos
+            left.keys.append(parent.keys[key_index])
+            parent.keys[key_index] = right.keys.pop(0)
+            
+            ptr = right.children.pop(0)
+            left.children.append(ptr)
+        
+
+        self._write_node(parent)
+        self._write_node(left)
+        self._write_node(right)
+        
+        return True, False
+        
+    def _merge_nodes(self, parent, left, right, key_index):
+        """
+        Fusiona dos nodos hermanos, bajando la clave separadora del padre al nodo izquierdo.
+        
+        Args:
+            parent: Nodo padre
+            left: Hermano izquierdo
+            right: Hermano derecho
+            key_index: Índice de la clave del padre entre ambos nodos
+            
+        Returns:
+            tuple: (True, underflow_propagado) - Éxito y posible underflow en el padre
+        """
+        if not left.is_leaf:
+            left.keys.append(parent.keys[key_index])
+        
+        left.keys.extend(right.keys)
+        left.children.extend(right.children)
+        
+        if left.is_leaf:
+            left.next_leaf = right.next_leaf
+        
+        parent.keys.pop(key_index)
+        parent.children.pop(key_index + 1)
+        
+        # liberar memoria
+        self.free_pages.append(right.page_id)
+        
+        self._write_node(left)
+        self._write_node(parent)
+    
+        min_keys = (self.order - 1) // 2
+        parent_underflow = len(parent.keys) < min_keys and parent.page_id != self.root_page_id
+        
+        return True, parent_underflow
     
     def rebuild(self):
         """Reorganiza la estructura del índice"""
@@ -505,7 +734,6 @@ class BPlusTree(IndexBase):
         while not node.is_leaf:
             node = self._read_node(node.children[0])
         
-        # Recorrer todas las hojas usando la lista enlazada
         while node is not None:
             for i, key in enumerate(node.keys):
                 record_pos = node.children[i]
@@ -514,7 +742,6 @@ class BPlusTree(IndexBase):
                     record_data = f.read(self.table_ref._get_record_size())
                     result.append(self.table_ref._deserialize_record(record_data))
             
-            # Moverse a la siguiente hoja
             if node.next_leaf is not None:
                 node = self._read_node(node.next_leaf)
             else:
@@ -529,12 +756,10 @@ class BPlusTree(IndexBase):
         if self.root_page_id is None:
             return count
         
-        # Encontrar la hoja más a la izquierda
         node = self._read_node(self.root_page_id)
         while not node.is_leaf:
             node = self._read_node(node.children[0])
         
-        # Contar registros en todas las hojas
         while node is not None:
             count += len(node.keys)
             
@@ -557,3 +782,14 @@ class BPlusTree(IndexBase):
                 elif col_type.startswith("VARCHAR"):
                     size += int(col_type.split("(")[1].split(")")[0])
             return size
+    
+    def free_page(self, page_id):
+        """
+        Marca una página como libre para su posterior reutilización.
+        
+        Args:
+            page_id (int): ID de la página a liberar
+        """
+        if page_id is not None and page_id < self.num_pages:
+            self.free_pages.append(page_id)
+            self._save_metadata()

@@ -46,6 +46,7 @@ class Table:
         spatial_columns=None,
         file_path=None,
         data_dir=os.path.join(os.getcwd(), "data"),
+        from_table=False,
     ):
         self.name = name
         self.columns = columns
@@ -60,7 +61,6 @@ class Table:
         self.spatial_columns = spatial_columns or []
         self.spatial_indexes = {}
 
-        self._create_spatial_indexes()
 
         # el pack string es el que se usa para serializar los datos:
         self.pack_string = "".join(
@@ -82,8 +82,10 @@ class Table:
             with open(self.metadata_path, "wb") as f:
                 pass
 
-        self._create_primary_index()
-        self._save_metadata()
+        if not from_table:
+            self._create_primary_index()
+            self._create_spatial_indexes()
+            self._save_metadata()
 
         if file_path:
             self._load_from_file(file_path)
@@ -115,15 +117,18 @@ class Table:
             page_size,
             index_type=index_type,
             data_dir=data_dir,
+            from_table=True,
         )
         table.metadata_path = os.path.join(data_dir, "tables", f"{name}.json")
         table.data_path = os.path.join(data_dir, "tables", f"{name}.dat")
         table.metadata = metadata
         table.pack_string = metadata.get("pack_string", "")
         table.record_count = metadata.get("record_count", 0)
+        table.spatial_columns = metadata.get("spatial_columns", [])
 
         # Create index
         table._create_primary_index()
+        table._create_spatial_indexes()
 
         return table
 
@@ -187,12 +192,7 @@ class Table:
             dict o list: Registro encontrado (si es primary key) o lista de registros
         """
         if column == self.primary_key:
-            # Para primary key, buscar en todos los registros
-            all_records = self.get_all()
-            for record in all_records:
-                if record[self.primary_key] == value:
-                    return record
-            return None
+            return self.index.search(value)
         else:
             # Full scan para columnas no indexadas
             results = []
@@ -277,11 +277,12 @@ class Table:
             raise ValueError(
                 f"Can only remove records by primary key ({self.primary_key})"
             )
-
-        # Verificar que el registro existe antes de eliminar
+        
+        # buscar
         existing_record = self.search(self.primary_key, value)
         if not existing_record:
-            return False  # Registro no encontrado
+            print(f"Record with primary key {value} not found")
+            return False
 
         # Remove from spatial indexes first
         for spatial_index in self.spatial_indexes.values():
