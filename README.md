@@ -7,11 +7,13 @@ Sistema de gestión de base de datos con soporte para múltiples estructuras de 
 - Interfaz gráfica para consultas SQL
 - Creación de tablas y gestión de datos
 - Soporte para múltiples estructuras de indexación:
+
   - Sequential/AVL File
   - B+ Tree
   - Hash (estático y dinámico)
 
 - Soporte para índices avanzados:
+
   - R-Tree (para datos espaciales)
   - GIN (para texto)
   - IVF (para vectores)
@@ -28,12 +30,14 @@ Sistema de gestión de base de datos con soporte para múltiples estructuras de 
 ## Instalación
 
 1. Clonar el repositorio:
+
 ```bash
 git clone https://github.com/yourusername/BD-II-Project.git
 cd BD-II-Project
 ```
 
 2. Crear un entorno virtual (opcional pero recomendado):
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # En Linux/Mac
@@ -42,6 +46,7 @@ source venv/bin/activate  # En Linux/Mac
 ```
 
 3. Instalar las dependencias:
+
 ```bash
 pip install -r requirements.txt
 ```

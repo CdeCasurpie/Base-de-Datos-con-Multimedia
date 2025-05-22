@@ -1,8 +1,111 @@
+# --- Entornos virtuales ---
+.venv/
+venv/
+ENV/
+env/
+pip-wheel-metadata/
+*.egg-info/
+*.egg
+data/
 
-.venv
-/venv
+# --- Archivos de compilación de Python ---
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+
+# --- Archivos de bases de datos temporales ---
 *.db
+*.sqlite
+*.sqlite3
+
+# --- Logs y reportes ---
+*.log
+*.out
+*.err
+*.coverage
+coverage.xml
+*.cover
+*.lcov
+*.pid
+
+# --- Cachés y herramientas de análisis estático ---
+.mypy_cache/
+.pytest_cache/
+.tox/
+.cache/
+.nox/
+hypothesis/
+.dmypy.json
+.pyre/
+.pytype/
+
+# --- Archivos de configuración de entornos/locales ---
+*.env
+*.env.*
+.envrc
+*.ini
+*.cfg
+secrets.json
+
+# --- Archivos generados por IDEs y editores ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# --- Datos del usuario o salidas del sistema ---
+*.bak
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Archivos de exportación de notebooks ---
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# --- Carpeta de datos del proyecto ---
+/data/
+output/
+results/
+exports/
+models/
+checkpoints/
+
+# --- Archivos de serialización ---
+*.joblib
+*.pkl
+*.pickle
+*.npy
+*.npz
+
+# --- Documentación generada ---
+_build/
+dist/
+build/
+docs/_build/
+*.pdf
+
+# --- Configs específicas ---
+*.tar.gz
+*.whl
+MANIFEST
+
+# --- Otros posibles residuos ---
+*.manifest
+*.spec
+*.exe
+*.dll
+*.so
+*.dylib
+
+#--Objetos pesados--
+*.mp4
+*.zip
+*.tar
+*.gz
+*.bz2
