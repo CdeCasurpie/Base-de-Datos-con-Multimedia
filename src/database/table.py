@@ -2,6 +2,7 @@ import os
 import json
 import struct
 from database.indexes.b_plus import BPlusTree
+from database.indexes.extendible_hash import ExtendibleHash   
 from database.indexes.r_tree import RTreeIndex
 
 
@@ -144,7 +145,15 @@ class Table:
                 table_ref=self,
                 page_size=self.page_size,
             )
-
+        elif self.index_type == "extendible_hash":
+            self.index = ExtendibleHash(
+                table_name=self.name,
+                column_name=self.primary_key,
+                data_path=self.data_path,
+                table_ref=self,
+                page_size=self.page_size
+            )
+    
     def _save_metadata(self):
         """
         Save the table metadata to a JSON file.

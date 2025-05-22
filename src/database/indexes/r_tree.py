@@ -5,9 +5,9 @@ from rtree import index
 from shapely.geometry import Point, Polygon, box, LineString
 from shapely.wkt import loads as wkt_loads
 import json
+from database.index_base import IndexBase
 
-
-class RTreeIndex:
+class RTreeIndex(IndexBase):
     def __init__(self, table_name, column_name, data_path, table_ref, page_size=4096):
         """
         Inicializa el índice R-Tree para una columna espacial específica.
@@ -196,6 +196,12 @@ class RTreeIndex:
             if item.id == spatial_id:
                 return item.object
         return None
+    
+    def search(self, key):
+        return self.search_by_id(key)
+    
+    def count(self):
+        return len(self.record_id_to_spatial_id)
 
     def intersection(self, geometry_or_bounds):
         """
