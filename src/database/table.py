@@ -3,6 +3,7 @@ import json
 import struct
 import pickle
 from database.indexes.b_plus import BPlusTree
+from database.indexes.extendible_hash import ExtendibleHash   
 
 class Table:
     DATA_TYPES = {
@@ -97,6 +98,14 @@ class Table:
         """
         if self.index_type == "bplus_tree":
             self.index = BPlusTree(
+                table_name=self.name,
+                column_name=self.primary_key,
+                data_path=self.data_path,
+                table_ref=self,
+                page_size=self.page_size
+            )
+        elif self.index_type == "extendible_hash":
+            self.index = ExtendibleHash(
                 table_name=self.name,
                 column_name=self.primary_key,
                 data_path=self.data_path,

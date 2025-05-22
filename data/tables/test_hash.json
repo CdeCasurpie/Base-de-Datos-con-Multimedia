@@ -1,0 +1,13 @@
+{
+    "name": "test_hash",
+    "columns": {
+        "id": "INT",
+        "name": "VARCHAR(30)",
+        "age": "INT",
+        "score": "FLOAT"
+    },
+    "index_type": "extendible_hash",
+    "primary_key": "id",
+    "record_count": 1001,
+    "pack_string": "i30sid"
+}
