@@ -131,11 +131,17 @@ def parse_query(query):
                         primary_key_found = col_name
                         if col_index_type:
                             table_index_type = col_index_type.lower()
-                            # Mapear nombres de índices
-                            if table_index_type == 'seq':
+                            # Mapear nombres de índices a los tipos internos del sistema
+                            if table_index_type in ['seq', 'sequential', 'sequential_index']:
                                 table_index_type = 'sequential'
-                            elif table_index_type == 'btree':
+                            elif table_index_type in ['btree', 'bplus', 'b_plus', 'b_tree', 'b_tree_index', 'bplus_tree']:
                                 table_index_type = 'bplus_tree'
+                            elif table_index_type in ['hash', 'extendible_hash', 'ext_hash', 'extendible', 'hash_index', 'hash_table']:
+                                table_index_type = 'extendible_hash'
+                            elif table_index_type in ['isam', 'isam_sparse', 'sparse', 'isam_index', 'isam_table', 'isam_sparse_index']:
+                                table_index_type = 'isam_sparse'
+                            elif table_index_type in ['rtree', 'r_tree', 'spatial', 'spatial_index', 'rtree_index', 'rtree_table', 'rtree_sparse']:
+                                table_index_type = 'rtree'
                     
                     # Si tiene SPATIAL INDEX o es un tipo espacial, agregarlo a spatial_columns
                     if is_spatial_index or data_type in ['POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY']:
