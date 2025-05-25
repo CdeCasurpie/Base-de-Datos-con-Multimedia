@@ -74,12 +74,13 @@ class Database:
         """
         pass
 
-    def select_from_table(self, selected_columns, table_name, where_clause=None):
+    def select_from_table(self, selected_columns, table_name, column_clause=None, where_clause=None):
         """
         Params:
             selected_columns (list): The columns to select from the table.
             table_name (str): The name of the table to select from.
-            where_clause (str, optional): The condition to filter the results. Defaults to None.
+            column_clause (str, optional): The condition to filter the columns. Defaults to None.
+            where_clause (str, optional): The condition to filter the rows. Defaults to None.
             
         Returns:
             list: A list of selected rows from the table based on the query.
