@@ -2,22 +2,29 @@ import re
 
 def parse_query(query):
     """
-    Parser SQL para el sistema de base de datos.
+    Parser SQL para el sistema de base de datos con soporte espacial.
     
     Gramática soportada:
     
     CREATE_TABLE ::= "CREATE TABLE" table_name "(" column_definitions ")" [table_options]
     column_definitions ::= column_def ("," column_def)*
     column_def ::= column_name data_type [constraints]
-    data_type ::= "INT" | "FLOAT" | "VARCHAR" "(" size ")" | "DATE" | "BOOLEAN" | "ARRAY" "[" data_type "]"
-    constraints ::= "KEY" | "INDEX" index_type
+    data_type ::= "INT" | "FLOAT" | "VARCHAR" "(" size ")" | "DATE" | "BOOLEAN" | 
+                  "POINT" | "POLYGON" | "LINESTRING" | "GEOMETRY"
+    constraints ::= "KEY" | "INDEX" index_type | "SPATIAL INDEX"
     table_options ::= "using index" index_type "(" column_name ")"
+    
+    CREATE_SPATIAL_INDEX ::= "CREATE SPATIAL INDEX" index_name "ON" table_name "(" column_name ")"
     
     SELECT ::= "select" ("*" | column_list) "from" table_name [where_clause] [spatial_clause]
     column_list ::= column_name ("," column_name)*
     where_clause ::= "where" condition
     condition ::= column_name operator value | column_name "between" value "and" value
-    spatial_clause ::= "where" column_name "in" "(" point "," radius ")"
+    spatial_clause ::= "where" spatial_condition
+    spatial_condition ::= column_name "within" "(" point "," radius ")" |
+                         column_name "intersects" geometry |
+                         column_name "nearest" point ["limit" number] |
+                         column_name "in_range" "(" min_point "," max_point ")"
     operator ::= "=" | "!=" | "<" | ">" | "<=" | ">="
     
     INSERT ::= "insert into" table_name "values" "(" value_list ")"
@@ -33,8 +40,23 @@ def parse_query(query):
     query = query.strip()
     
     try:
+        # CREATE SPATIAL INDEX
+        spatial_index_pattern = r'''
+            CREATE\s+SPATIAL\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(\s*(\w+)\s*\)
+            \s*;?$
+        '''
         
-        # CREATE TABLE con definición completa de columnas
+        match = re.match(spatial_index_pattern, query, re.IGNORECASE | re.VERBOSE)
+        if match:
+            return {
+                'type': 'CREATE_SPATIAL_INDEX',
+                'index_name': match.group(1),
+                'table_name': match.group(2),
+                'column_name': match.group(3),
+                'error_message': None
+            }
+
+        # CREATE TABLE con definición completa de columnas (incluyendo tipos espaciales)
         create_table_pattern = r'''
             CREATE\s+TABLE\s+(\w+)\s*\(
             \s*(.+?)\s*
@@ -54,8 +76,9 @@ def parse_query(query):
             columns = {}
             primary_key_found = None
             table_index_type = index_type
+            spatial_columns = []
             
-            # Dividir por comas, pero respetando paréntesis en VARCHAR y ARRAY
+            # Dividir por comas, pero respetando paréntesis en VARCHAR y geometrías
             column_defs = []
             paren_count = 0
             bracket_count = 0
@@ -83,14 +106,14 @@ def parse_query(query):
             for col_def in column_defs:
                 col_def = col_def.strip()
                 
-                # Patrón más flexible para diferentes combinaciones:
-                # column_name data_type [KEY] [INDEX index_type]
-                # column_name data_type [INDEX index_type]
+                # Patrón flexible para diferentes combinaciones incluyendo SPATIAL INDEX:
+                # column_name data_type [KEY] [INDEX index_type] [SPATIAL INDEX]
                 col_pattern = r'''
-                    (\w+)\s+                                    # column name
-                    ((?:VARCHAR\(\d+\)|ARRAY\[\w+\]|\w+))\s*    # data type  
-                    (?:(KEY)\s*)?                               # optional KEY
-                    (?:INDEX\s+(\w+))?                          # optional INDEX type
+                    (\w+)\s+                                                # column name
+                    ((?:VARCHAR\(\d+\)|POINT|POLYGON|LINESTRING|GEOMETRY|\w+))\s*  # data type  
+                    (?:(KEY)\s*)?                                           # optional KEY
+                    (?:INDEX\s+(\w+)\s*)?                                   # optional INDEX type
+                    (?:(SPATIAL\s+INDEX)\s*)?                               # optional SPATIAL INDEX
                 '''
                 
                 col_match = re.match(col_pattern, col_def, re.IGNORECASE | re.VERBOSE)
@@ -100,6 +123,7 @@ def parse_query(query):
                     data_type = col_match.group(2).upper()
                     is_key = col_match.group(3) is not None
                     col_index_type = col_match.group(4)
+                    is_spatial_index = col_match.group(5) is not None
                     
                     columns[col_name] = data_type
                     
@@ -112,16 +136,23 @@ def parse_query(query):
                                 table_index_type = 'sequential'
                             elif table_index_type == 'btree':
                                 table_index_type = 'bplus_tree'
-                            elif table_index_type == 'rtree':
-                                table_index_type = 'rtree'
+                    
+                    # Si tiene SPATIAL INDEX o es un tipo espacial, agregarlo a spatial_columns
+                    if is_spatial_index or data_type in ['POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY']:
+                        spatial_columns.append(col_name)
+                        
                 else:
                     # Si no coincide el patrón completo, intentar patrón más simple
-                    simple_pattern = r'(\w+)\s+((?:VARCHAR\(\d+\)|ARRAY\[\w+\]|\w+))'
+                    simple_pattern = r'(\w+)\s+((?:VARCHAR\(\d+\)|POINT|POLYGON|LINESTRING|GEOMETRY|\w+))'
                     simple_match = re.match(simple_pattern, col_def, re.IGNORECASE)
                     if simple_match:
                         col_name = simple_match.group(1)
                         data_type = simple_match.group(2).upper()
                         columns[col_name] = data_type
+                        
+                        # Si es tipo espacial, agregarlo automáticamente
+                        if data_type in ['POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY']:
+                            spatial_columns.append(col_name)
             
             # Si no se especificó primary key en using clause, usar el encontrado con KEY
             if not primary_key and primary_key_found:
@@ -137,6 +168,7 @@ def parse_query(query):
                 'columns': columns,
                 'primary_key': primary_key,
                 'index_type': table_index_type,
+                'spatial_columns': spatial_columns,
                 'error_message': None
             }
         
@@ -159,7 +191,7 @@ def parse_query(query):
                 'error_message': None
             }
         
-        # SELECT simple
+        # SELECT con soporte para consultas espaciales
         select_pattern = r'''
             select\s+(\*|[\w\s,]+)\s+from\s+(\w+)
             (?:\s+where\s+(.+?))?
@@ -180,7 +212,7 @@ def parse_query(query):
             }
             
             if where_clause:
-                # Parsear condición WHERE
+                # Parsear condición WHERE (incluyendo espaciales)
                 where_condition = parse_where_clause(where_clause)
                 if where_condition.get('error_message'):
                     return {
@@ -238,7 +270,7 @@ def parse_query(query):
             'error_location': 'Query syntax',
             'query': query
         }
-    
+        
     except Exception as e:
         return {
             'type': 'ERROR',
@@ -251,33 +283,101 @@ def parse_query(query):
 def parse_where_clause(where_clause):
     """
     Parsea la cláusula WHERE y retorna información sobre la condición.
+    Incluye soporte para condiciones espaciales.
     
     Tipos de condiciones soportadas:
-    - column = value
+    - column = value (comparación estándar)
     - column != value  
-    - column < value
-    - column > value
-    - column <= value
-    - column >= value
-    - column between value1 and value2
-    - column in (point, radius)  # Para búsqueda espacial
+    - column < value, column > value, column <= value, column >= value
+    - column between value1 and value2 (rango)
+    - column within (point, radius) (búsqueda espacial por radio)
+    - column intersects geometry (intersección geométrica)
+    - column nearest point [limit k] (k vecinos más cercanos)
+    - column in_range (min_point, max_point) (rango espacial)
     
     Retorna diccionario con 'error_message' (None si no hay error).
     """
     where_clause = where_clause.strip()
     
     try:
-    
-        # Búsqueda espacial: column in (point, radius)
-        spatial_pattern = r'(\w+)\s+in\s*\(\s*\(([^)]+)\)\s*,\s*(\d+(?:\.\d+)?)\s*\)'
-        match = re.match(spatial_pattern, where_clause, re.IGNORECASE)
+        # Búsqueda espacial: WITHIN (punto, radio)
+        within_pattern = r'(\w+)\s+within\s*\(\s*(.+?)\s*,\s*(\d+(?:\.\d+)?)\s*\)'
+        match = re.match(within_pattern, where_clause, re.IGNORECASE)
         if match:
             column = match.group(1)
             point_str = match.group(2)
             radius = float(match.group(3))
             
-            # Parsear punto (x, y)
-            point_coords = [float(x.strip()) for x in point_str.split(',')]
+            # Parsear punto - puede ser (x, y) o POINT(x y)
+            point = parse_spatial_value(point_str)
+            
+            return {
+                'condition_type': 'SPATIAL_WITHIN',
+                'column': column,
+                'point': point,
+                'radius': radius,
+                'error_message': None
+            }
+        
+        # Búsqueda por intersección: INTERSECTS
+        intersects_pattern = r'(\w+)\s+intersects\s+(.+?)$'
+        match = re.match(intersects_pattern, where_clause, re.IGNORECASE)
+        if match:
+            column = match.group(1)
+            geometry_str = match.group(2)
+            geometry = parse_spatial_value(geometry_str)
+            
+            return {
+                'condition_type': 'SPATIAL_INTERSECTS',
+                'column': column,
+                'geometry': geometry,
+                'error_message': None
+            }
+        
+        # Búsqueda de vecinos más cercanos: NEAREST
+        nearest_pattern = r'(\w+)\s+nearest\s+(.+?)(?:\s+limit\s+(\d+))?$'
+        match = re.match(nearest_pattern, where_clause, re.IGNORECASE)
+        if match:
+            column = match.group(1)
+            point_str = match.group(2)
+            limit = int(match.group(3)) if match.group(3) else 1
+            
+            point = parse_spatial_value(point_str)
+            
+            return {
+                'condition_type': 'SPATIAL_NEAREST',
+                'column': column,
+                'point': point,
+                'limit': limit,
+                'error_message': None
+            }
+        
+        # Búsqueda por rango espacial: IN_RANGE
+        range_spatial_pattern = r'(\w+)\s+in_range\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)'
+        match = re.match(range_spatial_pattern, where_clause, re.IGNORECASE)
+        if match:
+            column = match.group(1)
+            min_point_str = match.group(2)
+            max_point_str = match.group(3)
+            
+            min_point = parse_spatial_value(min_point_str)
+            max_point = parse_spatial_value(max_point_str)
+            
+            return {
+                'condition_type': 'SPATIAL_RANGE',
+                'column': column,
+                'min_point': min_point,
+                'max_point': max_point,
+                'error_message': None
+            }
+        
+        # Búsqueda espacial original: IN (point, radius) para compatibilidad
+        spatial_pattern = r'(\w+)\s+in\s*\(\s*\(([^)]+)\)\s*,\s*(\d+(?:\.\d+)?)\s*\)'
+        match = re.match(spatial_pattern, where_clause, re.IGNORECASE)
+        if match:
+            column = match.group(1)
+            point_coords = [float(x.strip()) for x in match.group(2).split(',')]
+            radius = float(match.group(3))
             
             return {
                 'condition_type': 'SPATIAL',
@@ -321,7 +421,7 @@ def parse_where_clause(where_clause):
             'error_message': f'Condición WHERE no reconocida: {where_clause}',
             'error_location': 'WHERE clause syntax'
         }
-    
+        
     except Exception as e:
         return {
             'condition_type': 'ERROR',
@@ -330,10 +430,47 @@ def parse_where_clause(where_clause):
         }
 
 
+def parse_spatial_value(value_str):
+    """
+    Parsea valores espaciales en diferentes formatos:
+    - (x, y) -> tupla
+    - POINT(x y) -> tupla
+    - 'POLYGON(...)' -> string WKT
+    - etc.
+    """
+    value_str = value_str.strip()
+    
+    # Formato (x, y)
+    if value_str.startswith('(') and value_str.endswith(')'):
+        coords_str = value_str[1:-1]
+        coords = [float(x.strip()) for x in coords_str.split(',')]
+        return tuple(coords)
+    
+    # Formato WKT: POINT(x y), POLYGON(...), etc.
+    if value_str.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')):
+        return value_str  # Retornar como string WKT
+    
+    # Si está entre comillas, es un string WKT
+    if (value_str.startswith('"') and value_str.endswith('"')) or \
+       (value_str.startswith("'") and value_str.endswith("'")):
+        return value_str[1:-1]
+    
+    # Intentar parsear como coordenadas separadas por espacio (formato WKT interno)
+    try:
+        coords = [float(x) for x in value_str.split()]
+        if len(coords) == 2:
+            return tuple(coords)
+    except ValueError:
+        pass
+    
+    # Si no se puede parsear, retornar como string
+    return value_str
+
+
 def parse_values(values_str):
     """
     Parsea una lista de valores separados por comas.
-    Maneja strings entre comillas, números, booleanos, etc.
+    Maneja strings entre comillas, números, booleanos, geometrías WKT, etc.
     """
     values = []
     current_value = ""
@@ -377,6 +514,7 @@ def parse_values(values_str):
 def parse_value(value_str):
     """
     Parsea un valor individual y retorna el tipo correcto de dato.
+    Incluye soporte para geometrías WKT.
     """
     value_str = value_str.strip()
     
@@ -390,16 +528,23 @@ def parse_value(value_str):
     elif value_str.lower() == 'false':
         return False
     
+    # Geometrías WKT
+    if value_str.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')):
+        return value_str
+    
     # String entre comillas
     if (value_str.startswith('"') and value_str.endswith('"')) or \
        (value_str.startswith("'") and value_str.endswith("'")):
         return value_str[1:-1]
     
-    # Array/Tuple notation (x, y)
+    # Array/Tuple notation (x, y) para puntos
     if value_str.startswith('(') and value_str.endswith(')'):
         inner = value_str[1:-1]
-        elements = [parse_value(elem.strip()) for elem in inner.split(',')]
-        return tuple(elements)
+        try:
+            elements = [parse_value(elem.strip()) for elem in inner.split(',')]
+            return tuple(elements)
+        except:
+            return value_str
     
     # Número flotante
     if '.' in value_str:
@@ -418,25 +563,46 @@ def parse_value(value_str):
     return value_str
 
 
+# Función de prueba
 if __name__ == "__main__":
+    # Ejemplos de prueba con soporte espacial
     test_queries = [
+        # CREATE TABLE con tipos espaciales
         """CREATE TABLE Restaurantes (
             id INT KEY INDEX SEQ,
             nombre VARCHAR(20) INDEX BTree,
             fechaRegistro DATE,
-            ubicacion ARRAY[FLOAT] INDEX RTree
+            ubicacion POINT SPATIAL INDEX
         );""",
         
+        # CREATE SPATIAL INDEX
+        "CREATE SPATIAL INDEX idx_ubicacion ON Restaurantes (ubicacion);",
+        
+        # CREATE TABLE desde archivo
         "create table Restaurantes from file 'C:\\restaurantes.csv' using index isam('id')",
         
-        "select * from Restaurantes where id = x",
+        # SELECT con búsqueda espacial - WITHIN
+        "select * from Restaurantes where ubicacion within ((40.7128, -74.0060), 5.0)",
         
-        "select * from Restaurantes where nombre between x and y",
+        # SELECT con búsqueda espacial - INTERSECTS
+        "select nombre from Restaurantes where ubicacion intersects 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'",
         
-        "insert into Restaurantes values (1, 'Pizza Hut', '2023-01-15', (40.7128, -74.0060))",
+        # SELECT con búsqueda de vecinos más cercanos
+        "select * from Restaurantes where ubicacion nearest (40.7128, -74.0060) limit 3",
         
+        # SELECT con rango espacial
+        "select * from Restaurantes where ubicacion in_range ((0, 0), (50, 50))",
+        
+        # SELECT tradicional
+        "select * from Restaurantes where id = 5",
+        
+        # INSERT con geometría
+        "insert into Restaurantes values (1, 'Pizza Hut', '2023-01-15', 'POINT(40.7128 -74.0060)')",
+        
+        # DELETE
         "delete from Restaurantes where id = 5",
         
+        # SELECT con búsqueda espacial original (compatibilidad)
         "select * from Restaurantes where ubicacion in ((40.7128, -74.0060), 5.0)"
     ]
     
@@ -455,18 +621,3 @@ if __name__ == "__main__":
             print(f"Unexpected error parsing: {query}")
             print(f"Error: {e}")
             print("-" * 50)
-
-    print("All tests completed.")
-
-    while True:
-        user_query = input("Ingrese una consulta SQL para analizar (o 'exit' para salir): ")
-        if user_query.lower() == 'exit':
-            break
-        result = parse_query(user_query)
-        if result.get('error_message'):
-            print(f"ERROR: {result['error_message']}")
-            if result.get('error_location'):
-                print(f"Location: {result['error_location']}")
-        else:
-            print(f"Parsed: {result}")
-    
