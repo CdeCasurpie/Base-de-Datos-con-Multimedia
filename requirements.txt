@@ -1,4 +1,7 @@
+colorama==0.4.6
+numpy==2.2.6
 PyQt5==5.15.11
-rtree==1.1.0
-shapely==2.0.4
-
+PyQt5-Qt5==5.15.17
+PyQt5_sip==12.17.0
+rtree==1.4.0
+shapely==2.1.1

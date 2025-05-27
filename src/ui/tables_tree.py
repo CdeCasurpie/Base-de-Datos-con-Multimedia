@@ -22,7 +22,6 @@ class TablesTree(QTreeWidget):
         self.clear()
         
         try:
-            self.db._load_tables()
             table_names = self.db.list_tables()
             
             if not table_names:

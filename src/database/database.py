@@ -458,7 +458,7 @@ class Database:
                     table = Table.from_table_name(table_name, 4096, self.data_dir)
                     self.tables[table_name] = table
                 except Exception as e:
-                    print(f"Error cargando tabla {table_name}: {e}")
+                    pass
 
     def _is_int(self, value):
         """Verifica si un string puede convertirse a entero."""
