@@ -32,7 +32,7 @@ def parse_query(query):
     
     DELETE ::= "delete from" table_name "where" column_name "=" value
     
-    LOAD ::= "create table" table_name "from file" file_path "using index" index_type "(" column_name ")"
+    LOAD ::= "create table" table_name "from file" file_path "using index" index_type "(" column_name ")"   
     
     Retorna siempre un diccionario con 'error_message' (None si no hay error).
     """
