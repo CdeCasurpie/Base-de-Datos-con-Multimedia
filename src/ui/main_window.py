@@ -114,27 +114,49 @@ class MainWindow(QMainWindow):
         """Maneja la selección de una tabla en el árbol"""
         query = f"SELECT * FROM {table_name};"
         self.query_panel.set_query_text(query)
-        
+
     def _get_info_html(self):
-        """Retorna HTML con información del sistema"""
+        """Retorna HTML con información del sistema con tema oscuro"""
         return """
         <html>
         <head>
             <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #2c3e50; }
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    background-color: #2c2c2c;
+                    color: #ecf0f1;
+                }
+                h1 { color: #ecf0f1; }
                 h2 { color: #3498db; }
+                h3 { color: #bdc3c7; }
                 .feature { margin-left: 20px; }
-                code { background-color: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
-                pre { background-color: #f8f8f8; padding: 10px; border-radius: 5px; overflow: auto; }
+                code {
+                    background-color: #34495e;
+                    color: #ecf0f1;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                }
+                pre {
+                    background-color: #34495e;
+                    color: #ecf0f1;
+                    padding: 10px;
+                    border-radius: 5px;
+                    overflow: auto;
+                }
+                ul {
+                    margin-top: 0;
+                }
+                ul li {
+                    margin-bottom: 4px;
+                }
             </style>
         </head>
         <body>
             <h1>Sistema de Base de Datos Multimodal</h1>
             <p>Este sistema implementa una base de datos con soporte para múltiples estructuras de índices y tipos de datos espaciales.</p>
-            
+
             <h2>Características principales</h2>
-            
             <div class="feature">
                 <h3>Estructuras de índices soportadas</h3>
                 <ul>
@@ -145,7 +167,7 @@ class MainWindow(QMainWindow):
                     <li><strong>R-Tree</strong> - Índice espacial para datos geométricos</li>
                 </ul>
             </div>
-            
+
             <div class="feature">
                 <h3>Tipos de datos soportados</h3>
                 <ul>
@@ -160,7 +182,7 @@ class MainWindow(QMainWindow):
                     <li><strong>GEOMETRY</strong> - Geometrías genéricas</li>
                 </ul>
             </div>
-            
+
             <div class="feature">
                 <h3>Operaciones espaciales soportadas</h3>
                 <ul>
@@ -170,9 +192,8 @@ class MainWindow(QMainWindow):
                     <li><strong>IN_RANGE</strong> - Búsqueda en un rango espacial rectangular</li>
                 </ul>
             </div>
-            
+
             <h2>Ejemplos de consultas válidas</h2>
-            
             <div class="feature">
                 <h3>Creación de tablas</h3>
                 <pre><code>CREATE TABLE usuarios (
@@ -181,7 +202,7 @@ class MainWindow(QMainWindow):
     email VARCHAR(100),
     activo BOOLEAN
 ) using index bplus_tree(id);</code></pre>
-                
+
                 <h3>Tabla con datos espaciales</h3>
                 <pre><code>CREATE TABLE lugares (
     id INT KEY,
@@ -189,10 +210,10 @@ class MainWindow(QMainWindow):
     ubicacion POINT SPATIAL INDEX,
     area POLYGON
 ) using index bplus_tree(id);</code></pre>
-                
+
                 <h3>Creación de índice espacial</h3>
                 <pre><code>CREATE SPATIAL INDEX idx_ubicacion ON lugares (ubicacion);</code></pre>
-                
+
                 <h3>Consultas espaciales</h3>
                 <pre><code>-- Búsqueda por radio
 SELECT * FROM lugares WHERE ubicacion WITHIN ((10, 20), 5.0);
@@ -217,6 +238,8 @@ SELECT * FROM lugares WHERE ubicacion IN_RANGE ((0, 0), (10, 10));</code></pre>
         </body>
         </html>
         """
+
+
         
     def closeEvent(self, event):
         """Maneja el cierre de la ventana principal"""
