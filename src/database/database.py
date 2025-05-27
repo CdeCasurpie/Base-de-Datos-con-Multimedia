@@ -51,13 +51,14 @@ class Database:
             self.tables[table_name] = table
             
             elapsed = __import__('time').time() - start_time
+
             return True, f"Tabla '{table_name}' creada exitosamente en {elapsed:.3f}s"
         except Exception as e:
             return False, f"Error al crear tabla: {e}"
 
     def create_table_from_file(self, table_name, file_path, index_type="sequential", primary_key=None, page_size=4096):
         """
-        Crea una tabla a partir de un archivo JSON o CSV.
+        Crea una tabla a partir de un archivo JSON o CSV sin cargar todo en memoria.
 
         Params:
             table_name (str): Nombre de la tabla.
@@ -78,130 +79,282 @@ class Database:
         try:
             import json
             import csv
+            from datetime import datetime
             
             # Determinar tipo de archivo por extensión
             if file_path.lower().endswith('.json'):
-                # Leer archivo JSON
-                with open(file_path, 'r') as f:
-                    data = json.load(f)
+                # Para JSON, usaremos un enfoque de streaming
+                import ijson  # Necesitarías instalar ijson: pip install ijson
                 
-                if not isinstance(data, list) or not data:
-                    return False, "El archivo JSON debe contener una lista de registros"
-                
-                # Inferir estructura de columnas del primer registro
-                first_record = data[0]
+                # Primera pasada: determinar estructura
                 columns = {}
-                for col, value in first_record.items():
-                    if isinstance(value, int):
-                        columns[col] = "INT"
-                    elif isinstance(value, float):
-                        columns[col] = "FLOAT"
-                    elif isinstance(value, bool):
-                        columns[col] = "BOOLEAN"
-                    elif isinstance(value, str):
-                        # Detectar si es tipo espacial por formato WKT
-                        if value.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')):
-                            columns[col] = value.split('(')[0].upper()
-                        else:
-                            # Estimar longitud para VARCHAR
-                            max_len = max(30, len(value) + 10)
-                            columns[col] = f"VARCHAR({max_len})"
+                sample_count = 0
+                with open(file_path, 'rb') as f:
+                    # Leer el archivo JSON como un stream
+                    parser = ijson.parse(f)
+                    current_path = []
+                    current_record = {}
+                    
+                    for prefix, event, value in parser:
+                        if event == 'start_array' and not prefix:
+                            continue
+                        elif event == 'end_array' and not prefix:
+                            break
+                        
+                        # Navegar por la estructura del JSON
+                        if event == 'start_map':
+                            current_record = {}
+                        elif event == 'end_map':
+                            # Procesar record completo
+                            if sample_count < 100:  # Limitar muestras
+                                for col, val in current_record.items():
+                                    if col not in columns:
+                                        columns[col] = self._infer_column_type(val)
+                                    else:
+                                        # Actualizar tipo si es necesario (ej: de INT a VARCHAR)
+                                        columns[col] = self._reconcile_types(columns[col], val)
+                                        
+                                sample_count += 1
+                        elif event == 'map_key':
+                            current_path.append(value)
+                        elif event in ('string', 'number', 'boolean', 'null'):
+                            if current_path:
+                                key = current_path[-1]
+                                current_record[key] = value
+                                current_path.pop()
+                    
+                # Detectar columnas espaciales
+                spatial_columns = [col for col, tipo in columns.items() 
+                                if tipo in ["POINT", "POLYGON", "LINESTRING", "GEOMETRY"]]
+                
+                # Si no se especificó primary_key, usar la primera columna
+                if not primary_key and columns:
+                    primary_key = list(columns.keys())[0]
+                
+                # Crear la tabla con la estructura inferida
+                table = Table(
+                    name=table_name,
+                    columns=columns,
+                    primary_key=primary_key,
+                    page_size=page_size,
+                    index_type=index_type,
+                    spatial_columns=spatial_columns
+                )
+                
+                # Segunda pasada: cargar datos
+                records_loaded = 0
+                records_total = 0
+                
+                print(f"Cargando datos desde {file_path}...")
+                start_time = __import__('time').time()
+                batch_size = 1000
+                batch = []
+                
+                with open(file_path, 'rb') as f:
+                    # Leer el archivo JSON como un stream nuevamente
+                    parser = ijson.items(f, 'item')
+                    
+                    for record in parser:
+                        records_total += 1
+                        
+                        try:
+                            # Procesar datos para que coincidan con los tipos definidos
+                            processed_record = self._process_record_for_table(record, columns)
+                            
+                            # Añadir al batch
+                            batch.append(processed_record)
+                            
+                            # Insertar batch cuando alcanza el tamaño definido
+                            if len(batch) >= batch_size:
+                                for rec in batch:
+                                    table.add(rec)
+                                    records_loaded += 1
+                                
+                                batch = []
+                                
+                                # Mostrar progreso
+                                elapsed = __import__('time').time() - start_time
+                                print(f"Progreso: {records_loaded} registros cargados en {elapsed:.2f}s", end='\r')
+                        
+                        except Exception as e:
+                            print(f"\nError cargando registro #{records_total}: {e}")
+                    
+                    # Cargar registros restantes del batch
+                    for rec in batch:
+                        try:
+                            table.add(rec)
+                            records_loaded += 1
+                        except Exception as e:
+                            print(f"\nError cargando registro: {e}")
             
             elif file_path.lower().endswith('.csv'):
-                # Leer archivo CSV
-                with open(file_path, 'r') as f:
-                    csv_reader = csv.reader(f)
-                    headers = next(csv_reader)  # Primera línea como cabeceras
-                    
-                    # Leer algunos registros para inferir tipos
-                    sample_data = []
-                    for i, row in enumerate(csv_reader):
-                        if i >= 10:  # Limitar a 10 registros para análisis
-                            break
-                        sample_data.append(row)
-                
-                # Inferir tipos de columnas
+                # Primera pasada: contar registros y analizar estructura
+                total_records = 0
                 columns = {}
-                for i, col in enumerate(headers):
-                    # Analizar muestras de valores
-                    sample_values = [row[i] for row in sample_data if i < len(row)]
-                    
-                    if all(self._is_int(val) for val in sample_values):
-                        columns[col] = "INT"
-                    elif all(self._is_float(val) for val in sample_values):
-                        columns[col] = "FLOAT"
-                    elif all(val.lower() in ('true', 'false', '1', '0') for val in sample_values):
-                        columns[col] = "BOOLEAN"
-                    else:
-                        # Comprobar si es tipo espacial por formato WKT
-                        if any(val.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')) 
-                               for val in sample_values):
-                            # Determinar tipo específico
-                            for val in sample_values:
-                                if val.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')):
-                                    columns[col] = val.split('(')[0].upper()
-                                    break
-                        else:
-                            # Estimar longitud para VARCHAR
-                            max_len = max(30, max(len(val) for val in sample_values) + 10)
-                            columns[col] = f"VARCHAR({max_len})"
                 
-                # Convertir datos CSV a formato JSON para carga
-                data = []
-                with open(file_path, 'r') as f:
+                print("Analizando estructura del CSV...")
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     csv_reader = csv.reader(f)
                     headers = next(csv_reader)
-                    for row in csv_reader:
-                        record = {}
-                        for i, col in enumerate(headers):
-                            if i < len(row):
-                                val = row[i]
-                                # Convertir según tipo inferido
-                                col_type = columns[col]
-                                if col_type == "INT":
-                                    record[col] = int(val) if val else 0
-                                elif col_type == "FLOAT":
-                                    record[col] = float(val) if val else 0.0
-                                elif col_type == "BOOLEAN":
-                                    record[col] = val.lower() in ('true', '1')
-                                else:
-                                    record[col] = val
-                        data.append(record)
+                    total_records += 1;
+                    
+                    # Inicializar diccionario para almacenar información sobre columnas
+                    column_stats = {col: {
+                        'types_seen': set(),
+                        'max_length': 0,
+                        'sample_values': []
+                    } for col in headers}
+                    
+                    # Analizar una muestra de registros para inferir tipos
+                    for i, row in enumerate(csv_reader):
+                        total_records += 1
+                        
+                        # Limitar análisis detallado a primeros 1000 registros
+                        if i < 1000:
+                            for j, val in enumerate(row):
+                                if j < len(headers):
+                                    col = headers[j]
+                                    val_len = len(val)
+                                    
+                                    # Actualizar longitud máxima
+                                    if val_len > column_stats[col]['max_length']:
+                                        column_stats[col]['max_length'] = val_len
+                                    
+                                    # Determinar tipo
+                                    if self._is_int(val):
+                                        column_stats[col]['types_seen'].add('INT')
+                                    elif self._is_float(val):
+                                        column_stats[col]['types_seen'].add('FLOAT')
+                                    elif val.lower() in ('true', 'false', '1', '0'):
+                                        column_stats[col]['types_seen'].add('BOOLEAN')
+                                    elif val.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')):
+                                        spatial_type = val.split('(')[0].upper()
+                                        column_stats[col]['types_seen'].add(spatial_type)
+                                        column_stats[col]['sample_values'].append(val)
+                                    else:
+                                        column_stats[col]['types_seen'].add('VARCHAR')
+                        
+                        # Solo contar el resto de registros
+                        if i % 10000 == 0:
+                            print(f"Analizados {i} registros...", end='\r')
+                
+                # Determinar el tipo final para cada columna
+                for col, stats in column_stats.items():
+                    types = stats['types_seen']
+                    
+                    # Priorizar tipos espaciales
+                    if any(t in ["POINT", "POLYGON", "LINESTRING", "GEOMETRY"] for t in types):
+                        for val in stats['sample_values']:
+                            if val and val.upper().startswith(('POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY')):
+                                columns[col] = val.split('(')[0].upper()
+                                break
+                    # Si hay mezcla de tipos numéricos, usar el más flexible
+                    elif 'VARCHAR' in types:
+                        max_len = max(30, stats['max_length'] + 10)
+                        columns[col] = f"VARCHAR({max_len})"
+                    elif 'FLOAT' in types:
+                        columns[col] = "FLOAT"
+                    elif 'INT' in types:
+                        columns[col] = "INT"
+                    elif 'BOOLEAN' in types:
+                        columns[col] = "BOOLEAN"
+                    else:
+                        # Por defecto, usar VARCHAR
+                        max_len = max(30, stats['max_length'] + 10)
+                        columns[col] = f"VARCHAR({max_len})"
+                
+                # Detectar columnas espaciales
+                spatial_columns = [col for col, tipo in columns.items() 
+                                if tipo in ["POINT", "POLYGON", "LINESTRING", "GEOMETRY"]]
+                
+                # Si no se especificó primary_key, usar la primera columna
+                if not primary_key and columns:
+                    primary_key = list(columns.keys())[0]
+                
+                print(f"\nEstructura de tabla inferida: {len(columns)} columnas")
+                
+                # Crear la tabla con la estructura inferida
+                table = Table(
+                    name=table_name,
+                    columns=columns,
+                    primary_key=primary_key,
+                    page_size=page_size,
+                    index_type=index_type,
+                    spatial_columns=spatial_columns
+                )
+                
+                # Segunda pasada: cargar datos
+                records_loaded = 0
+                batch_size = 1000
+                batch = []
+                
+                print(f"Cargando {total_records} registros desde {file_path}...")
+                start_time = __import__('time').time()
+                
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    csv_reader = csv.reader(f)
+                    headers = next(csv_reader)  # Leer headers de nuevo
+                    
+                    for i, row in enumerate(csv_reader):
+                        try:
+                            record = {}
+                            for j, col in enumerate(headers):
+                                if j < len(row):
+                                    val = row[j]
+                                    # Convertir según tipo inferido
+                                    col_type = columns[col]
+                                    
+                                    if col_type == "INT" and val:
+                                        record[col] = int(val)
+                                    elif col_type == "FLOAT" and val:
+                                        record[col] = float(val)
+                                    elif col_type == "BOOLEAN":
+                                        record[col] = val.lower() in ('true', '1')
+                                    else:
+                                        record[col] = val
+                            
+                            # Añadir al batch
+                            batch.append(record)
+                            
+                            # Insertar batch cuando alcanza el tamaño definido
+                            if len(batch) >= batch_size:
+                                for rec in batch:
+                                    table.add(rec)
+                                    records_loaded += 1
+                                
+                                batch = []
+                                
+                                # Mostrar progreso cada 10,000 registros
+                                if records_loaded % 10000 == 0:
+                                    elapsed = __import__('time').time() - start_time
+                                    rate = records_loaded / elapsed if elapsed > 0 else 0
+                                    eta = (total_records - records_loaded) / rate if rate > 0 else "desconocido"
+                                    eta_str = f"{eta:.0f}s" if isinstance(eta, float) else eta
+                                    print(f"Progreso: {records_loaded}/{total_records} registros ({records_loaded/total_records*100:.1f}%) - Velocidad: {rate:.1f} reg/s - ETA: {eta_str}", end='\r')
+                        
+                        except Exception as e:
+                            print(f"\nError cargando registro #{i+2}: {e}")
+                    
+                    # Cargar registros restantes del batch
+                    for rec in batch:
+                        try:
+                            table.add(rec)
+                            records_loaded += 1
+                        except Exception as e:
+                            print(f"\nError cargando registro: {e}")
+            
             else:
                 return False, "Formato de archivo no soportado. Use JSON o CSV."
             
-            # Detectar columnas espaciales
-            spatial_columns = [col for col, tipo in columns.items() 
-                              if tipo in ["POINT", "POLYGON", "LINESTRING", "GEOMETRY"]]
-            
-            # Si no se especificó primary_key, usar la primera columna
-            if not primary_key and columns:
-                primary_key = list(columns.keys())[0]
-            
-            # Crear la tabla
-            table = Table(
-                name=table_name,
-                columns=columns,
-                primary_key=primary_key,
-                page_size=page_size,
-                index_type=index_type,
-                spatial_columns=spatial_columns
-            )
-            
-            # Cargar datos
-            records_loaded = 0
-            for record in data:
-                try:
-                    table.add(record)
-                    records_loaded += 1
-                except Exception as e:
-                    print(f"Error cargando registro: {e}")
-            
             self.tables[table_name] = table
             
-            return True, f"Tabla '{table_name}' creada con {records_loaded} registros de {len(data)}"
+            elapsed_total = __import__('time').time() - start_time
+            print(f"\nCarga completada en {elapsed_total:.2f}s")
+            return True, f"Tabla '{table_name}' creada con {records_loaded} registros"
         
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"Error creando tabla desde archivo: {e}"
     
     def execute_query(self, query):
@@ -241,7 +394,15 @@ class Database:
                     index_type=parsed['index_type'],
                     primary_key=parsed['primary_key']
                 )
+                print(f"CREATE TABLE FROM FILE: {message}")
+                print(f"CREATE TABLE FROM FILE: {not success}")
                 return message, not success 
+            
+            # DROP TABLE
+            elif query_type == 'DROP_TABLE':
+                table_name = parsed['table_name']
+                success, message = self.drop_table(table_name)
+                return message, not success
             
             # CREATE SPATIAL INDEX
             elif query_type == 'CREATE_SPATIAL_INDEX':
@@ -744,3 +905,104 @@ class Database:
             return True, f"Índice espacial creado para la columna '{column}'"
         else:
             return False, f"Ya existe un índice espacial para la columna '{column}'"
+    
+    def drop_table(self, table_name):
+        """
+        Elimina una tabla de la base de datos incluyendo todos sus archivos asociados.
+        
+        Params:
+            table_name (str): Nombre de la tabla a eliminar.
+            
+        Returns:
+            tuple: (bool, str) - Éxito y mensaje informativo.
+        """
+        if table_name not in self.tables:
+            return False, f"La tabla '{table_name}' no existe"
+        
+        try:
+            # Obtener objeto de la tabla y rutas a archivos
+            table = self.tables[table_name]
+            
+            # Eliminar archivos de datos y metadatos
+            tables_path = os.path.join(self.data_dir, "tables")
+            data_file = os.path.join(tables_path, f"{table_name}.dat")
+            metadata_file = os.path.join(tables_path, f"{table_name}.json")
+            
+            # Eliminar archivos de índice primario
+            index_files = []
+            if table.index_type == "sequential":
+                index_files.extend([
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_seq_index.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_seq_overflow.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_seq_metadata.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_seq_metadata.json")
+                ])
+            elif table.index_type == "bplus_tree":
+                index_files.extend([
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_index.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_index_metadata.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_index_metadata.json")
+                ])
+            elif table.index_type == "extendible_hash":
+                index_files.extend([
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_hash_dir.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_hash_dir.json"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_hash_buckets.dat")
+                ])
+            elif table.index_type == "isam_sparse":
+                index_files.extend([
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_isam_index.dat"),
+                    os.path.join(tables_path, f"{table_name}_{table.primary_key}_isam_index.json")
+                ])
+            
+            # Eliminar archivos de índices espaciales
+            if table.spatial_columns:
+                for col in table.spatial_columns:
+                    rtree_path = os.path.join(self.data_dir, "indexes", "rtree")
+                    spatial_files = [
+                        os.path.join(rtree_path, f"{table_name}_{col}.dat"),
+                        os.path.join(rtree_path, f"{table_name}_{col}.idx"),
+                        os.path.join(rtree_path, f"{table_name}_{col}_metadata.json")
+                    ]
+                    index_files.extend(spatial_files)
+
+            # Eliminar archivos físicamente
+            files_deleted = 0
+            errors = []
+            
+            # Eliminar archivos de datos primero
+            if os.path.exists(data_file):
+                try:
+                    os.remove(data_file)
+                    files_deleted += 1
+                except Exception as e:
+                    errors.append(f"Error al eliminar {data_file}: {e}")
+            
+            if os.path.exists(metadata_file):
+                try:
+                    os.remove(metadata_file)
+                    files_deleted += 1
+                except Exception as e:
+                    errors.append(f"Error al eliminar {metadata_file}: {e}")
+            
+            # Eliminar archivos de índices
+            for file_path in index_files:
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        files_deleted += 1
+                    except Exception as e:
+                        errors.append(f"Error al eliminar {file_path}: {e}")
+            
+            # Eliminar la tabla del diccionario de tablas
+            del self.tables[table_name]
+            
+            if errors:
+                return True, f"Tabla '{table_name}' eliminada con algunas advertencias: {'; '.join(errors)}"
+            else:
+                return True, f"Tabla '{table_name}' eliminada completamente ({files_deleted} archivos eliminados)"
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return False, f"Error al eliminar tabla '{table_name}': {e}"

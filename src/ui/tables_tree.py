@@ -22,6 +22,7 @@ class TablesTree(QTreeWidget):
         self.clear()
         
         try:
+            self.db._load_tables()
             table_names = self.db.list_tables()
             
             if not table_names:
@@ -29,12 +30,18 @@ class TablesTree(QTreeWidget):
                 empty_item.setText(0, "No hay tablas disponibles")
                 return
             
+            # borrar elementos existentes
+            self.clear()
+            
+            
             for table_name in table_names:
                 table_item = QTreeWidgetItem(self)
                 table_item.setText(0, table_name)
                 table_item.setData(0, 256, {"type": "table", "name": table_name})
-                
+
+
                 self._add_table_details(table_item, table_name)
+
         except Exception as e:
             print(f"Error al actualizar tablas: {e}")
             error_item = QTreeWidgetItem(self)
