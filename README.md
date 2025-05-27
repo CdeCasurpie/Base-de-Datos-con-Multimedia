@@ -106,12 +106,13 @@ Las pruebas se realizaron con datasets de 100, 1,000 y 10,000 registros, midiend
 
 ### Resultados de Inserción (ms por registro)
 
-| Registros | Hash Extensible | Sequential File | B+ Tree | ISAM Sparse |
-|-----------|----------------|-----------------|---------|-------------|
-| 100       | 0.95           | 0.44            | 0.59    | 0.13        |
-| 1,000     | 8.2            | 5.2             | 5.89    | 4.71        |
-| 10,000    | 101.06         | 136.15          | 69.26   | 174.51      |
-
+| Registros | Hash Extensible | Sequential File | B+ Tree | ISAM Sparse | R Tree |
+|-----------|-----------------|-----------------|---------|-------------|--------|
+| 10        | 0.1             | 0.0 5           | 0.05    | 0.04        |0.45    |
+| 100       | 0.95            | 0.44            | 0.59    | 0.13        |1.80    |
+| 1,000     | 8.2             | 5.2             | 5.89    | 4.71        |45.65   |
+| 10,000    | 101.06          | 136.15          | 69.26   | 174.51      |2960.05 |
+| 100,000   | 1001.05         | 1798.6          | 796.30  | 6328.5      |18112.05|
 ### Análisis por Técnica
 
 **ISAM Sparse**: Excelente rendimiento inicial debido a su estructura estática, pero degradación severa con volúmenes grandes por acumulación de overflow pages.
