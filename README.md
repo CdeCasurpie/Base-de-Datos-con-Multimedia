@@ -113,6 +113,10 @@ Las pruebas se realizaron con datasets de 100, 1,000 y 10,000 registros, midiend
 | 1,000     | 8.2             | 5.2             | 5.89    | 4.71        |45.65   |
 | 10,000    | 101.06          | 136.15          | 69.26   | 174.51      |2960.05 |
 | 100,000   | 1001.05         | 1798.6          | 796.30  | 6328.5      |18112.05|
+
+![Extendible Hash, Sequential File, Btree y ISAM (INSERCCIÓN)](https://github.com/user-attachments/assets/c36666a4-d9b8-43f9-bb2a-b40fbed71da5)
+
+
 ### Análisis por Técnica
 
 **ISAM Sparse**: Excelente rendimiento inicial debido a su estructura estática, pero degradación severa con volúmenes grandes por acumulación de overflow pages.
