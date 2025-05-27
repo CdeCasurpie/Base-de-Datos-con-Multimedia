@@ -102,11 +102,11 @@ src/
 
 ### Metodología de Pruebas
 
-Las pruebas se realizaron con datasets de 100, 1,000 y 10,000 registros, midiendo tiempo de inserción promedio por registro y operaciones de búsqueda.
+Las pruebas se realizaron con datasets de 10, 100, 1,000, 10,000 y 100,000 registros, midiendo tiempo de inserción promedio por registro y operaciones de búsqueda.
 
 ### Resultados de Inserción (ms por registro)
 
-| Registros | Hash Extensible | Sequential File | B+ Tree | ISAM Sparse | R Tree |
+| Registros | Hash Extensible | Sequential File | B+ Tree | ISAM Sparse | R-Tree |
 |-----------|-----------------|-----------------|---------|-------------|--------|
 | 10        | 0.1             | 0.0 5           | 0.05    | 0.04        |0.45    |
 | 100       | 0.95            | 0.44            | 0.59    | 0.13        |1.80    |
@@ -119,13 +119,15 @@ Las pruebas se realizaron con datasets de 100, 1,000 y 10,000 registros, midiend
 
 ### Análisis por Técnica
 
-**ISAM Sparse**: Excelente rendimiento inicial debido a su estructura estática, pero degradación severa con volúmenes grandes por acumulación de overflow pages.
+**B+ Tree**: Tiene la mejor complejidad entre todas las operaciones, con complejidad **O(log n)** para inserciones. Su estructura auto-balanceada garantiza un rendimiento logarítmico consistente, independientemente del patrón de datos, permitiéndole escalar eficientemente incluso con grandes volúmenes (como se observa en las pruebas con 100,000 registros). La jerarquía en la organización de los nodos y el mantenimiento automático del equilibrio minimizan la degradación, incluso durante inserciones masivas.
 
-**Hash Extensible**: Rendimiento escalable y consistente. Crecimiento prácticamente lineal con manejo dinámico de colisiones mediante división de buckets.
+**Hash Extensible**: Presenta un rendimiento escalable y consistente, con complejidad **O(1)** en el caso promedio para inserciones. Su crecimiento prácticamente lineal se debe al manejo dinámico de colisiones mediante la división de buckets al alcanzar su capacidad. La capacidad de duplicar el directorio cuando es necesario le permite adaptarse a conjuntos de datos crecientes sin comprometer significativamente el rendimiento, aunque puede experimentar algunos picos de latencia durante las operaciones de reorganización.
 
-**B+ Tree**: Mejor balance general entre todas las operaciones. Complejidad logarítmica garantizada por estructura auto-balanceada.
+**Sequential File**: Muestra un rendimiento variable según el patrón de inserción, con complejidad **O(n)** en el peor caso. Es altamente eficiente para datos que llegan en orden (cercano a **O(1)**), pero muy costoso para inserciones aleatorias debido a las reconstrucciones frecuentes del archivo principal cuando el área de overflow se satura. La degradación observada con volúmenes grandes (136ms/registro en 10,000) refleja este comportamiento, donde las reconstrucciones se vuelven cada vez más costosas.
 
-**Sequential File**: Rendimiento variable según patrón de inserción. Eficiente para datos ordenados, costoso para inserciones aleatorias por reconstrucciones frecuentes.
+**ISAM Sparse**: Ofrece un rendimiento inicial excelente debido a su estructura estática de dos niveles, con complejidad **O(1)** para las primeras inserciones. Sin embargo, empeora rápidamente con volúmenes grandes (6328ms/registro en 100,000) debido a la acumulación de overflow pages. A diferencia del B+ Tree, el índice ISAM es estático y no se reorganiza automáticamente, lo que provoca un deterioro progresivo del rendimiento a medida que las cadenas de overflow crecen y requieren búsquedas lineales adicionales.
+
+**R-Tree**: Muestra el rendimiento más lento en inserciones generales, con complejidad **O(log n)** en el mejor caso, pero **O(n)** en escenarios de división frecuente. Esta ineficiencia relativa (18112ms/registro en 100,000) se debe a las complejas operaciones geométricas necesarias para calcular y actualizar los rectángulos envolventes mínimos (MBRs) en cada nivel. Sin embargo, este costo adicional se justifica al realizar consultas espaciales, donde el R-Tree supera significativamente a otras estructuras gracias a su capacidad para podar rápidamente zonas de búsqueda irrelevantes.
 
 ### Búsquedas Espaciales (R-Tree)
 
