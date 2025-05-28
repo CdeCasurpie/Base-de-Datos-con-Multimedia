@@ -353,3 +353,8 @@ La interfaz utiliza patrón Model-View-Controller con PyQt5, separando lógica d
 ### Funcionalidades Avanzadas
 
 El sistema incluye plantillas contextuales, ejemplos interactivos, manejo robusto de errores y retroalimentación visual del estado de operaciones mediante barra de estado integrada.
+
+
+--- 
+Para más documentación visitar
+[https://deepwiki.com/Fabryzzio-Meza-Torres/Sistema-de-Base-de-Datos-Multimodal/1-overview#system-architecture](https://deepwiki.com/Fabryzzio-Meza-Torres/Sistema-de-Base-de-Datos-Multimodal/1-overview#system-architecture)
