@@ -1,5 +1,9 @@
 import re
 import string
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
 
 class TextProcessor:
     """
@@ -12,21 +16,41 @@ class TextProcessor:
         self.use_stemming = use_stemming
         self.remove_stopwords = remove_stopwords
         self.stopwords = set()
+        self.load_stopwords(language)
+        self.stemmer = PorterStemmer()
         
     def tokenize(self, text):
-        return []
+        return word_tokenize(text)
         
     def normalize(self, text):
-        return ""
+        # Poner en minúsculas y eliminar puntuación :)
+        text = text.lower()
+        text = re.sub(f"[{re.escape(string.punctuation)}]", "", text)
+        return text
         
     def remove_stopwords_from_tokens(self, tokens):
-        return []
+        if self.remove_stopwords:
+            return [word for word in tokens if word not in self.stopwords]
+        return tokens
         
     def stem_tokens(self, tokens):
-        return []
-        
+        if self.use_stemming:
+            return [self.stemmer.stem(word) for word in tokens]
+        return tokens
+    
     def process_text(self, text):
-        return []
+        normalized = self.normalize(text)
+        tokens = self.tokenize(normalized)
         
+        if not self.stopwords and self.remove_stopwords:
+            self.load_stopwords(self.language)
+
+        tokens_no_stop = self.remove_stopwords_from_tokens(tokens)
+        stemmed_tokens = self.stem_tokens(tokens_no_stop)
+        return stemmed_tokens
+
     def load_stopwords(self, language='english'):
-        pass
+        try:
+            self.stopwords = set(stopwords.words(language))
+        except:
+            print(f"No se pudo cargar stopwords para el idioma '{language}'")
