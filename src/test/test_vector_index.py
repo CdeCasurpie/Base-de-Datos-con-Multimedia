@@ -3,9 +3,10 @@ import sys
 import time
 import random
 import numpy as np
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database.indexes.vector_index import VectorIndex
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def clear_screen():
     """Limpia la pantalla de la consola"""
