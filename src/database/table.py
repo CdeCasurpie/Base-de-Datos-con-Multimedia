@@ -7,23 +7,7 @@ from database.indexes.isam_sparse import ISAMSparseIndex
 from database.indexes.extendible_hash import ExtendibleHash   
 from database.indexes.sequential_file import SequentialFile
 from database.indexes.r_tree import RTreeIndex
-
-class Table:
-    DATA_TYPES = {
-        "INT": {"size": 4, "format": "i"},
-        "FLOAT": {"size": 8, "format": "d"},
-        "VARCHAR": {"variable": True},
-        "DATE": {"size": 8, "format": "q"},
-        "BOOLEAN": {"size": 1, "format": "?"}
-    }
-import os
-import json
-import struct
-import pickle
-from database.indexes.b_plus import BPlusTree
-from database.indexes.isam_sparse import ISAMSparseIndex
-from database.indexes.extendible_hash import ExtendibleHash   
-from database.indexes.sequential_file import SequentialFile
+from database.indexes.inverted_index import InvertedIndex
 
 class Table:
     DATA_TYPES = {
@@ -620,3 +604,130 @@ class Table:
         for column, spatial_index in self.spatial_indexes.items():
             stats[column] = spatial_index.get_stats()
         return stats
+
+    def _create_inverted_index(self):
+        """Crea un índice invertido para la tabla."""
+        self.inverted_index = InvertedIndex(
+            table_name=self.name,
+            data_path=self.data_path,
+            table_ref=self,
+            page_size=self.page_size,
+        )
+        print(f"Índice invertido creado para la tabla: {self.name}")
+
+    def add(self, record):
+        # Validate record structure
+        for col_name in self.columns:
+            if col_name not in record:
+                raise ValueError(f"Missing column {col_name} in record")
+
+        # Check if primary key already exists
+        primary_key_value = record[self.primary_key]
+        existing_record = self.index.search(primary_key_value)
+
+        if existing_record:
+            raise ValueError(
+                f"Record with primary key {primary_key_value} already exists"
+            )
+
+        # Add the record to the index
+        self.index.add(record, primary_key_value)
+
+        # Add to inverted index
+        if hasattr(self, "inverted_index"):
+            self.inverted_index.add(record, primary_key_value)
+
+        # Serialize the record
+        for column, spatial_index in self.spatial_indexes.items():
+            if column in record:
+                try:
+                    spatial_index.add(record, primary_key_value)
+                except Exception as e:
+                    print(f"Error adding spatial index for {column}: {e}")
+
+        # Update record count
+        self.record_count += 1
+
+        # Save metadata
+        self._save_metadata()
+
+        return True
+
+    def remove(self, column, value):
+        """
+        Elimina un registro de la tabla.
+
+        Args:
+            column (str): Nombre de la columna (debe ser primary key)
+            value: Valor de la primary key a eliminar
+
+        Returns:
+            bool: True si se eliminó exitosamente
+        """
+        if column != self.primary_key:
+            raise ValueError(
+                f"Can only remove records by primary key ({self.primary_key})"
+            )
+        
+        # buscar
+        existing_record = self.search(self.primary_key, value)
+        if not existing_record:
+            print(f"Record with primary key {value} not found")
+            return False
+
+        # Remove from spatial indexes first
+        for spatial_index in self.spatial_indexes.values():
+            try:
+                spatial_index.remove(value)
+            except Exception as e:
+                print(f"Warning: Error removing from spatial index: {e}")
+
+        # Remove from inverted index
+        if hasattr(self, "inverted_index"):
+            try:
+                self.inverted_index.remove(value)
+            except Exception as e:
+                print(f"Warning: Error removing from inverted index: {e}")
+
+        # Remove the record from the primary index
+        try:
+            result = self.index.remove(value)
+            if result:
+                self.record_count -= 1
+                self._save_metadata()
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"Error removing from primary index: {e}")
+            return False
+
+    def search_inverted_index(self, column, value):
+        """
+        Busca registros usando el índice invertido.
+
+        Args:
+            column (str): Nombre de la columna
+            value: Valor a buscar
+
+        Returns:
+            dict o list: Registro encontrado (si es primary key) o lista de registros
+        """
+        if hasattr(self, "inverted_index"):
+            return self.inverted_index.search(value)
+        else:
+            raise ValueError(f"No inverted index found for table {self.name}")
+
+    def range_search_inverted_index(self, column, begin_key, end_key):
+        """Búsqueda por rango usando el índice invertido."""
+        if hasattr(self, "inverted_index"):
+            return self.inverted_index.range_search(begin_key, end_key)
+        else:
+            raise ValueError(f"No inverted index found for table {self.name}")
+
+    def get_inverted_index_stats(self):
+        """Obtiene estadísticas del índice invertido."""
+        if hasattr(self, "inverted_index"):
+            return self.inverted_index.get_stats()
+        else:
+            raise ValueError(f"No inverted index found for table {self.name}")

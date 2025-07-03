@@ -1,0 +1,15 @@
+{
+    "name": "documents",
+    "columns": {
+        "id": "INT",
+        "title": "VARCHAR(100)",
+        "content": "VARCHAR(1000)",
+        "category": "VARCHAR(50)",
+        "tags": "VARCHAR(200)"
+    },
+    "index_type": "bplus_tree",
+    "primary_key": "id",
+    "record_count": 100,
+    "pack_string": "i100s1000s50s200s",
+    "spatial_columns": []
+}
