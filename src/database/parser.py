@@ -11,11 +11,10 @@ def parse_query(query):
     column_def ::= column_name data_type [constraints]
     data_type ::= "INT" | "FLOAT" | "VARCHAR" "(" size ")" | "DATE" | "BOOLEAN" | 
                   "POINT" | "POLYGON" | "LINESTRING" | "GEOMETRY"
-    constraints ::= "KEY" | "INDEX" index_type | "SPATIAL INDEX" | "TEXT INDEX"
+    constraints ::= "KEY" | "INDEX" index_type | "SPATIAL INDEX"
     table_options ::= "using index" index_type "(" column_name ")"
     
     CREATE_SPATIAL_INDEX ::= "CREATE SPATIAL INDEX" index_name "ON" table_name "(" column_name ")"
-    CREATE_INVERTED_INDEX ::= "CREATE INVERTED INDEX" index_name "ON" table_name "(" column_name ")"
     
     DROP_TABLE ::= "DROP TABLE" table_name
     
@@ -101,22 +100,6 @@ def parse_query(query):
         if match:
             return {
                 'type': 'CREATE_SPATIAL_INDEX',
-                'index_name': match.group(1),
-                'table_name': match.group(2),
-                'column_name': match.group(3),
-                'error_message': None
-            }
-
-        # CREATE INVERTED INDEX
-        inverted_index_pattern = r'''
-            CREATE\s+INVERTED\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(\s*(\w+)\s*\)
-            \s*;?$
-        '''
-        
-        match = re.match(inverted_index_pattern, query, re.IGNORECASE | re.VERBOSE)
-        if match:
-            return {
-                'type': 'CREATE_INVERTED_INDEX',
                 'index_name': match.group(1),
                 'table_name': match.group(2),
                 'column_name': match.group(3),
@@ -640,9 +623,6 @@ if __name__ == "__main__":
         
         # CREATE SPATIAL INDEX
         "CREATE SPATIAL INDEX idx_ubicacion ON Restaurantes (ubicacion);",
-        
-        # CREATE INVERTED INDEX
-        "CREATE INVERTED INDEX idx_nombre ON Restaurantes (nombre);",
         
         # CREATE TABLE desde archivo
         "create table Restaurantes from file 'C:\\restaurantes.csv' using index isam('id')",
