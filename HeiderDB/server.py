@@ -5,8 +5,10 @@ import socket
 import json
 import argparse
 from HeiderDB.database.database import Database
+import nltk
 
-def run_server(host='127.0.0.1', port=54321):
+
+def run_server(host='0.0.0.0', port=54321):
     db = Database()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
@@ -26,8 +28,10 @@ def run_server(host='127.0.0.1', port=54321):
                 conn.sendall(response.encode())
 
 if __name__ == "__main__":
+    nltk.download('punkt_tab')
+    
     parser = argparse.ArgumentParser(description="Servidor HeiderDB")
-    parser.add_argument("--host", default="127.0.0.1", help="Host para escuchar")
+    parser.add_argument("--host", default="0.0.0.0", help="Host para escuchar")
     parser.add_argument("--port", type=int, default=54321, help="Puerto para escuchar")
     args = parser.parse_args()
 

@@ -1,267 +1,69 @@
-# HeiderDB: Sistema de Gestión de Base de Datos con Soporte Multimedia
+# HeiderDB | Multimedia y Textos
 
-## Descripción
+**HeiderDB** es una base de datos modular con soporte para índices secuenciales, B+ Trees, índices espaciales (R-Tree), e índices invertidos para texto. Incluye un servidor TCP personalizado y una API de cliente.
 
-HeiderDB es un sistema de gestión de base de datos (DBMS) orientado a datos estructurados, textuales y multimedia, desarrollado como proyecto de investigación y educativo. Ofrece una arquitectura modular con soporte para:
+## 🚀 Requisitos
 
-- Estructuras de datos avanzadas (B+Tree, Hash Extensible, ISAM, Sequential File)
-- Índices espaciales (R-Tree)
-- Búsqueda textual (Índices invertidos)
-- Indexación multimedia (imágenes y audio)
-- Interfaz CLI y GUI
+- Docker instalado (funciona en Windows, macOS y Linux)
+- Python 3.10+ solo si deseas correrlo fuera de Docker (no recomendado)
 
-## Características Principales
 
-- **Estructuras de Indexación**:
-  - B+ Tree: Para búsquedas eficientes por rango y exactas
-  - Hash Extensible: Para búsquedas exactas de alta velocidad
-  - ISAM: Para datos relativamente estáticos
-  - Sequential File: Para pequeños conjuntos de datos
-  - R-Tree: Para datos espaciales/geométricos
-  - Índices Invertidos: Para búsqueda textual y por relevancia
 
-- **Soporte de Tipos de Datos**:
-  - Tipos básicos: INT, FLOAT, VARCHAR, DATE, BOOLEAN
-  - Tipos espaciales: POINT, POLYGON, LINESTRING, GEOMETRY
-  - Tipo multimedia: Almacenamiento e indexación de imágenes y audio
+## 📦 Instalación con Docker
 
-- **Búsquedas Avanzadas**:
-  - Búsqueda textual: por términos individuales, booleana (AND/OR), rankeada por relevancia
-  - Búsqueda espacial: por radio, intersección, vecino más cercano, rango
-  - Búsqueda multimedia: por similitud visual o acústica
-
-- **Interfaces**:
-  - CLI: Interfaz de línea de comandos interactiva con soporte para SQL
-  - GUI: Interfaz gráfica para exploración visual de datos y resultados
-  - Cliente/Servidor: Modelo de comunicación mediante sockets
-
-## Requisitos
-
-- Python 3.8+
-- Dependencias (instalables mediante `requirements.txt`):
-  - PyQt5 (para GUI)
-  - NumPy, SciPy (para cálculos)
-  - OpenCV (para procesamiento de imágenes)
-  - TensorFlow, Keras (para extracción de características)
-  - librosa (para procesamiento de audio)
-  - rtree (para indexación espacial)
-  - nltk (para procesamiento de texto)
-
-## Instalación
-
-1. Clone el repositorio:
-   ```bash
-   git clone https://github.com/usuario/Base-de-Datos-con-Multimedia.git
-   cd Base-de-Datos-con-Multimedia
-   ```
-
-2. Instale las dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Asegúrese de descargar los recursos necesarios para NLTK:
-   ```python
-   import nltk
-   nltk.download('punkt')
-   nltk.download('stopwords')
-   ```
-
-## Ejecución
-
-El sistema se puede ejecutar de varias formas:
-
-### Interfaz Gráfica (GUI)
+### 1. Clona el proyecto
 
 ```bash
-python -m HeiderDB.main
-# o simplemente
-python -m HeiderDB.main --gui
-```
+git clone https://github.com/tu_usuario/HeiderDB.git
+cd HeiderDB
+````
 
-### Interfaz de Línea de Comandos (CLI)
-
-```bash
-python -m HeiderDB.main --cli
-```
-
-### Aplicación de Prueba
+### 2. Construye la imagen de Docker
 
 ```bash
-python -m TestApp.main
+docker build -t heiderdb .
 ```
 
-### Pruebas Unitarias
+### 3. Ejecuta el servidor
+
+#### En Linux / macOS:
 
 ```bash
-python -m HeiderDB.test.test_btree
-python -m HeiderDB.test.test_inverted_index
-python -m HeiderDB.test.test_rtree
-# etc...
+docker run --rm -v "$PWD:/app" -w /app -p 54321:54321 heiderdb
 ```
 
-### Modo Cliente/Servidor
+#### En Windows (CMD o PowerShell):
 
-1. Primero inicie el servidor:
-   ```bash
-   python -m HeiderDB.server
-   ```
-
-2. Luego, conéctese con el cliente:
-   ```python
-   from HeiderDB.client import HeiderClient
-   
-   client = HeiderClient()
-   result = client.send_query("SELECT * FROM tabla")
-   print(result)
-   ```
-
-## Guía de Uso
-
-### Comandos SQL Básicos
-
-#### Crear una tabla
-
-```sql
-CREATE TABLE personas (
-  id INT,
-  nombre VARCHAR(100),
-  edad INT,
-  ubicacion POINT
-) USING INDEX bplus_tree(id);
+```bash
+docker run --rm -v "%cd%:/app" -w /app -p 54321:54321 heiderdb
 ```
 
-#### Crear tabla desde archivo
+El servidor escuchará en `localhost:54321`.
 
-```sql
-CREATE TABLE documentos 
-FROM FILE '/ruta/al/archivo.json'
-USING INDEX bplus_tree(id);
+
+### ¿Qué hace?
+
+* El servidor ejecuta `python -m HeiderDB.server`
+* Se conecta con el cliente (`HeiderClient`) vía socket
+* Guarda los archivos de datos en tu carpeta local (`/data/`)
+
+
+## 💬 Ejecutar el cliente
+
+Puedes usar el cliente en `HeiderDB/client.py` para enviar consultas SQL:
+
+```bash
+python HeiderDB/client.py --query "SELECT * FROM usuarios;"
 ```
 
-#### Insertar datos
+O pasarle host y puerto:
 
-```sql
-INSERT INTO personas VALUES (1, 'Juan Pérez', 30, 'POINT(10 20)');
+```bash
+python HeiderDB/client.py --host 127.0.0.1 --port 54321 --query "SELECT * FROM usuarios;"
 ```
 
-#### Consultar datos
 
-```sql
--- Consulta simple
-SELECT * FROM personas WHERE id = 1;
+##  Notas
 
--- Consulta por rango
-SELECT * FROM personas WHERE edad BETWEEN 20 AND 30;
-
--- Consulta espacial
-SELECT * FROM personas WHERE ubicacion WITHIN 5 OF POINT(10 20);
-```
-
-### Índices Textuales
-
-#### Crear un índice invertido
-
-```sql
-CREATE INVERTED INDEX idx_nombre ON personas (nombre);
-```
-
-#### Consultas textuales
-
-```sql
--- Búsqueda por término
-SELECT * FROM personas WHERE nombre CONTAINS 'Juan';
-
--- Búsqueda booleana
-SELECT * FROM personas WHERE nombre CONTAINS 'Juan AND Pérez';
-SELECT * FROM personas WHERE nombre CONTAINS 'Juan OR Pedro';
-
--- Búsqueda por relevancia
-SELECT * FROM personas WHERE nombre RANKED BY 'Juan programador';
-```
-
-### Índices Espaciales
-
-#### Crear un índice espacial
-
-```sql
-CREATE SPATIAL INDEX ON personas (ubicacion);
-```
-
-#### Consultas espaciales
-
-```sql
--- Búsqueda por radio
-SELECT * FROM personas WHERE ubicacion WITHIN 5 OF POINT(10 20);
-
--- Búsqueda por intersección
-SELECT * FROM personas WHERE ubicacion INTERSECTS POLYGON((0 0, 10 0, 10 10, 0 10, 0 0));
-
--- Vecinos más cercanos
-SELECT * FROM personas WHERE ubicacion NEAREST POINT(10 20) LIMIT 5;
-
--- Búsqueda por rango espacial
-SELECT * FROM personas WHERE ubicacion IN RANGE(POINT(0 0), POINT(20 20));
-```
-
-### Comandos de Administración
-
-```sql
--- Listar tablas
-TABLES;
-
--- Mostrar estructura de tabla
-DESCRIBE personas;
-
--- Estadísticas de índices
-STATS personas;
-
--- Eliminar tabla
-DROP TABLE personas;
-```
-
-## Arquitectura del Sistema
-
-HeiderDB está organizado en los siguientes componentes principales:
-
-1. **Núcleo de Base de Datos (`database/`)**
-   - `database.py`: Coordinador principal
-   - `table.py`: Manejo de tablas y registros
-   - `parser.py`: Procesador de consultas SQL
-   - `index_base.py`: Clase base para todos los índices
-
-2. **Estructuras de Indexación (`database/indexes/`)**
-   - Estructuras clásicas: B+Tree, Hash Extensible, ISAM, Sequential File
-   - Índices espaciales: R-Tree
-   - Índices textuales: Inverted Index
-   - Índices multimedia: Vector Index con clustering
-
-3. **Componentes Multimedia**
-   - `feature_extractor.py`: Extracción de características de imágenes y audio
-   - `vector_index.py`: Indexación de vectores de características
-   - `multimedia_storage.py`: Almacenamiento de archivos multimedia
-   - `text_processor.py`: Procesamiento de texto para búsqueda
-
-4. **Interfaces de Usuario**
-   - CLI: Interfaz interactiva en `test_database.py`
-   - GUI: Interfaz gráfica basada en PyQt5 en `ui/`
-
-5. **Cliente/Servidor**
-   - `server.py`: Servidor TCP para procesar consultas remotas
-   - `client.py`: Cliente para envío de consultas al servidor
-
-## Limitaciones y Consideraciones
-
-- El sistema está diseñado principalmente con fines educativos y de investigación
-- No se recomienda para datos críticos o en entornos de producción
-- El rendimiento puede variar significativamente dependiendo del tamaño de los datos
-- La indexación multimedia requiere espacio adicional para almacenar vectores de características
-- La extracción de características para multimedia puede ser intensiva en CPU y memoria
-
-## Licencia
-
-Este proyecto está licenciado bajo [su licencia aquí].
-
-## Contribuciones
-
-Las contribuciones son bienvenidas. Por favor, abra un issue o pull request para mejoras o correcciones.
+* Este proyecto no usa HTTP ni REST, es un servidor TCP puro.
+* Todos los archivos creados se guardan en tu carpeta local gracias al volumen Docker.
