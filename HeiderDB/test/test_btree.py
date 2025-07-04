@@ -74,7 +74,7 @@ def print_records(records):
     
     print(f"Registros encontrados: {len(records)}")
     print("─" * 50)
-    print(f"│ {"ID".ljust(6)}│ {"Nombre".ljust(20)}│ {"Edad".ljust(6)}│ {"Puntuación".ljust(11)}│")
+    print(f"│ {'ID'.ljust(6)}│ {'Nombre'.ljust(20)}│ {'Edad'.ljust(6)}│ {'Puntuación'.ljust(11)}│")
     print("─" * 50)
     for record in records:
         print(f"│ {str(record['id']).ljust(6)}│ {record['name'].ljust(20)}│ {str(record['age']).ljust(6)}│ {str(record['score']).ljust(11)}│")

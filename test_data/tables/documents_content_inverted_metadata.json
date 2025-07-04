@@ -1,8 +1,0 @@
-{
-  "table_name": "documents",
-  "column_name": "content",
-  "doc_count": 50,
-  "vocabulary_size": 47,
-  "created_at": 1751584880.7227983,
-  "updated_at": 1751584880.801455
-}

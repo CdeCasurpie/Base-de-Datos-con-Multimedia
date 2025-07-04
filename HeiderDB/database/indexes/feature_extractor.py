@@ -117,59 +117,59 @@ class AudioExtractor(FeatureExtractor):
             print(f"Error procesando el archivo de audio {audio_path}: {e}")
             return np.array([])
 
-# if __name__ == '__main__':
-#     import sys # Necesario para sys.exit()
+if __name__ == '__main__':
+    import sys # Necesario para sys.exit()
 
-#     # --- 1. PREPARACIÓN: Definir nombres de archivo y verificar su existencia ---
+    # --- 1. PREPARACIÓN: Definir nombres de archivo y verificar su existencia ---
     
-#     # Nombres de archivo que el script esperará encontrar
-#     image_path = "test_image.jpeg"
-#     audio_path = "test_audio.mp3"
+    # Nombres de archivo que el script esperará encontrar
+    image_path = "test_image.jpeg"
+    audio_path = "test_audio.mp3"
 
-#     print("--- Verificando archivos de prueba ---")
+    print("--- Verificando archivos de prueba ---")
 
-#     # Verificar si el archivo de imagen existe
-#     if not os.path.exists(image_path):
-#         print(f"ERROR: No se encontró el archivo '{image_path}'.")
-#         print("Por favor, coloca una imagen con ese nombre en la misma carpeta que el script y vuelve a ejecutarlo.")
-#         sys.exit() # Detiene la ejecución del script
+    # Verificar si el archivo de imagen existe
+    if not os.path.exists(image_path):
+        print(f"ERROR: No se encontró el archivo '{image_path}'.")
+        print("Por favor, coloca una imagen con ese nombre en la misma carpeta que el script y vuelve a ejecutarlo.")
+        sys.exit() # Detiene la ejecución del script
 
-#     # Verificar si el archivo de audio existe
-#     if not os.path.exists(audio_path):
-#         print(f"ERROR: No se encontró el archivo '{audio_path}'.")
-#         print("Por favor, coloca un archivo de audio con ese nombre en la misma carpeta y vuelve a ejecutarlo.")
-#         sys.exit() # Detiene la ejecución del script
+    # Verificar si el archivo de audio existe
+    if not os.path.exists(audio_path):
+        print(f"ERROR: No se encontró el archivo '{audio_path}'.")
+        print("Por favor, coloca un archivo de audio con ese nombre en la misma carpeta y vuelve a ejecutarlo.")
+        sys.exit() # Detiene la ejecución del script
 
-#     print(f"Archivos '{image_path}' y '{audio_path}' encontrados. Iniciando pruebas...\n")
+    print(f"Archivos '{image_path}' y '{audio_path}' encontrados. Iniciando pruebas...\n")
 
-#     # --- 2. PRUEBA: ImageExtractor con SIFT ---
-#     print("--- Probando ImageExtractor (SIFT) ---")
-#     sift_extractor = ImageExtractor(method="sift")
-#     print(f"Dimensión de vector SIFT: {sift_extractor.get_vector_dimension()}")
-#     sift_features = sift_extractor.extract(image_path)
-#     print(f"Forma de descriptores SIFT: {sift_features.shape if sift_features is not None and sift_features.size > 0 else 'Ninguno'}\n")
+    # --- 2. PRUEBA: ImageExtractor con SIFT ---
+    print("--- Probando ImageExtractor (SIFT) ---")
+    sift_extractor = ImageExtractor(method="sift")
+    print(f"Dimensión de vector SIFT: {sift_extractor.get_vector_dimension()}")
+    sift_features = sift_extractor.extract(image_path)
+    print(f"Forma de descriptores SIFT: {sift_features.shape if sift_features is not None and sift_features.size > 0 else 'Ninguno'}\n")
 
-#     # --- 3. PRUEBA: ImageExtractor con CNN ---
-#     print("--- Probando ImageExtractor (CNN) ---")
-#     cnn_extractor = ImageExtractor(method="cnn")
-#     print(f"Dimensión de vector CNN: {cnn_extractor.get_vector_dimension()}")
-#     cnn_features = cnn_extractor.extract(image_path)
-#     print(f"Forma de vector CNN global: {cnn_features.shape}\n")
+    # --- 3. PRUEBA: ImageExtractor con CNN ---
+    print("--- Probando ImageExtractor (CNN) ---")
+    cnn_extractor = ImageExtractor(method="cnn")
+    print(f"Dimensión de vector CNN: {cnn_extractor.get_vector_dimension()}")
+    cnn_features = cnn_extractor.extract(image_path)
+    print(f"Forma de vector CNN global: {cnn_features.shape}\n")
 
 
-#     # --- 4. PRUEBA: AudioExtractor con MFCC ---
-#     print("--- Probando AudioExtractor (MFCC) ---")
-#     audio_extractor = AudioExtractor()
-#     print(f"Dimensión de cada vector MFCC: {audio_extractor.get_vector_dimension()}")
+    # --- 4. PRUEBA: AudioExtractor con MFCC ---
+    print("--- Probando AudioExtractor (MFCC) ---")
+    audio_extractor = AudioExtractor()
+    print(f"Dimensión de cada vector MFCC: {audio_extractor.get_vector_dimension()}")
     
-#     mfcc_features = audio_extractor.extract(audio_path)
-#     print(f"Forma de vectores locales MFCC: {mfcc_features.shape}")
+    mfcc_features = audio_extractor.extract(audio_path)
+    print(f"Forma de vectores locales MFCC: {mfcc_features.shape}")
     
-#     # Opcional: Crear un vector global promediando los locales
-#     if mfcc_features.size > 0:
-#         global_mfcc = np.mean(mfcc_features, axis=1)
-#         print(f"Forma del vector MFCC global (promediado): {global_mfcc.shape}\n")
-#     else:
-#         print("\n")
+    # Opcional: Crear un vector global promediando los locales
+    if mfcc_features.size > 0:
+        global_mfcc = np.mean(mfcc_features, axis=1)
+        print(f"Forma del vector MFCC global (promediado): {global_mfcc.shape}\n")
+    else:
+        print("\n")
 
-#     print("--- Pruebas completadas ---")
+    print("--- Pruebas completadas ---")
