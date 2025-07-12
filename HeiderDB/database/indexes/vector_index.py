@@ -142,72 +142,35 @@ class VectorIndex:
             id: Identificador único del vector
             vector: Vector de características (numpy array o lista)
         """
-        print(
-            f"DEBUG VectorIndex.add_vector: Añadiendo vector_id={id}, vector shape={vector.shape if hasattr(vector, 'shape') else len(vector)}"
-        )
-
         if isinstance(vector, list):
             vector = np.array(vector)
 
         self._invalidate_vectors_cache()
 
         if id in self.vector_index:
-            print(
-                f"DEBUG VectorIndex.add_vector: Actualizando vector existente id={id}"
-            )
+            # Actualizar vector existente
             page_id, position = self.vector_index[id]
             page_data = self._load_page(page_id)
             page_data["vectors"][position] = vector
             page_data["dirty"] = True
         else:
-            print(f"DEBUG VectorIndex.add_vector: Añadiendo nuevo vector id={id}")
+            # Añadir nuevo vector
             page_id = self._find_available_page()
-            print(
-                f"DEBUG VectorIndex.add_vector: _find_available_page() retornó page_id={page_id}"
-            )
-
             page_data = self._load_page(page_id)
-            print(
-                f"DEBUG VectorIndex.add_vector: _load_page({page_id}) retornó page_data con keys: {list(page_data.keys())}"
-            )
-
             page_info = self.page_directory[page_id]
-            print(
-                f"DEBUG VectorIndex.add_vector: page_info free_positions: {page_info['free_positions']}"
-            )
 
             if not page_info["free_positions"]:
-                print(
-                    f"DEBUG VectorIndex.add_vector: No hay posiciones libres, creando nueva página"
-                )
                 page_id = self._create_new_page()
                 page_data = self._load_page(page_id)
                 page_info = self.page_directory[page_id]
 
             position = page_info["free_positions"].pop(0)
-            print(
-                f"DEBUG VectorIndex.add_vector: Asignando position={position} en page_id={page_id}"
-            )
-
             page_data["vectors"][position] = vector
             page_data["dirty"] = True
-            print(
-                f"DEBUG VectorIndex.add_vector: Vector guardado en page_data['vectors'][{position}]"
-            )
-            print(
-                f"DEBUG VectorIndex.add_vector: page_data['vectors'] ahora tiene keys: {list(page_data['vectors'].keys())}"
-            )
 
             self.vector_index[id] = (page_id, position)
             page_info["vector_count"] += 1
             self.total_vectors += 1
-
-            print(
-                f"DEBUG VectorIndex.add_vector: vector_index[{id}] = ({page_id}, {position})"
-            )
-            print(
-                f"DEBUG VectorIndex.add_vector: total_vectors ahora es: {self.total_vectors}"
-            )
 
         if self.cluster_centers is not None:
             cluster_id = self._assign_to_nearest_cluster(vector)
@@ -216,8 +179,6 @@ class VectorIndex:
                 self.clusters[cluster_id] = []
             if id not in self.clusters[cluster_id]:
                 self.clusters[cluster_id].append(id)
-
-        print(f"DEBUG VectorIndex.add_vector: Finalizando add_vector para id={id}")
 
         self.save_metadata()
 
@@ -269,39 +230,16 @@ class VectorIndex:
         Returns:
             numpy.ndarray: Vector o None si no existe
         """
-        print(f"DEBUG VectorIndex.get_vector: Buscando vector_id={id}")
-        print(
-            f"DEBUG VectorIndex.get_vector: vector_index keys={list(self.vector_index.keys())}"
-        )
-
         if id not in self.vector_index:
-            print(f"DEBUG VectorIndex.get_vector: ERROR - {id} no está en vector_index")
             return None
 
         page_id, position = self.vector_index[id]
-        print(
-            f"DEBUG VectorIndex.get_vector: Found page_id={page_id}, position={position}"
-        )
-
         page_data = self._load_page(page_id)
-        print(
-            f"DEBUG VectorIndex.get_vector: _load_page({page_id}) retornó: {page_data is not None}"
-        )
 
         if page_data is None:
-            print(
-                f"DEBUG VectorIndex.get_vector: ERROR - page_data es None para page_id={page_id}"
-            )
             return None
 
         result = page_data["vectors"].get(position)
-        print(
-            f"DEBUG VectorIndex.get_vector: page_data['vectors'].get({position}) retornó: {result is not None}"
-        )
-        print(
-            f"DEBUG VectorIndex.get_vector: page_data['vectors'] keys: {list(page_data['vectors'].keys())}"
-        )
-
         return result
 
     @property
@@ -338,38 +276,19 @@ class VectorIndex:
         if isinstance(query_vector, list):
             query_vector = np.array(query_vector)
 
-        print(f"DEBUG VectorIndex: search_knn iniciado con k={k}")
-        print(
-            f"DEBUG VectorIndex: vector_index tiene {len(self.vector_index)} vectores"
-        )
-        print(f"DEBUG VectorIndex: vector_index keys: {list(self.vector_index.keys())}")
-
         if not self.vector_index:
-            print("DEBUG VectorIndex: vector_index está vacío, retornando []")
             return []
 
         distances = []
 
         for vector_id in self.vector_index.keys():
-            print(f"DEBUG VectorIndex: Procesando vector_id={vector_id}")
             vector = self.get_vector(vector_id)
-            print(
-                f"DEBUG VectorIndex: get_vector({vector_id}) retornó: {vector is not None}"
-            )
             if vector is not None:
                 distance = self.compute_distance(query_vector, vector)
-                print(f"DEBUG VectorIndex: Distancia para {vector_id}: {distance}")
                 distances.append((vector_id, distance))
-            else:
-                print(
-                    f"DEBUG VectorIndex: ERROR - get_vector({vector_id}) retornó None"
-                )
 
-        print(f"DEBUG VectorIndex: Total distancias calculadas: {len(distances)}")
         distances.sort(key=lambda x: x[1])
-        result = distances[:k]
-        print(f"DEBUG VectorIndex: Retornando {len(result)} resultados")
-        return result
+        return distances[:k]
 
     def search_knn_with_index(self, query_vector, k=5):
         """

@@ -42,29 +42,20 @@ class MultimediaIndex(IndexBase):
         if self.vector_index is None:
             raise RuntimeError("Index not initialized. Call initialize() first.")
         src = record[self.column_name]
-        print(f"DEBUG MultimediaIndex: Añadiendo vector para key={key}, src={src}")
+
+        # Limpiar bytes padding si es necesario
+        if isinstance(src, bytes):
+            src = src.decode("utf-8").rstrip("\x00")
 
         dst = self.storage.store(src)
-        print(f"DEBUG MultimediaIndex: Archivo almacenado en: {dst}")
-
         vec = self.feature_extractor.extract(dst)
-        print(
-            f"DEBUG MultimediaIndex: Vector extraído, dimensión: {len(vec) if vec is not None else 'None'}"
-        )
 
         if vec is not None:
             self.vector_index.add_vector(key, vec)
-            print(f"DEBUG MultimediaIndex: Vector añadido al VectorIndex")
-
-            # ¡IMPORTANTE! Guardar el VectorIndex después de añadir
             self.vector_index.save()
-            print(f"DEBUG MultimediaIndex: VectorIndex guardado exitosamente")
-
             self.metadata[key] = dst
             self._save_metadata()
-            print(f"DEBUG MultimediaIndex: Vector añadido exitosamente para key={key}")
         else:
-            print(f"DEBUG MultimediaIndex: ERROR - Vector es None para key={key}")
             raise RuntimeError(f"No se pudo extraer vector para {src}")
 
     def remove(self, key):
@@ -111,35 +102,19 @@ class MultimediaIndex(IndexBase):
         """
         Busca los k vectores más similares al archivo de consulta.
         """
-        print(
-            f"DEBUG MultimediaIndex: knn_search llamado con query_file='{query_file}', k={k}"
-        )
-
-        if self.vector_index is None:
-            print("DEBUG MultimediaIndex: vector_index es None")
-            return []
-
-        if self.feature_extractor is None:
-            print("DEBUG MultimediaIndex: feature_extractor es None")
+        if self.vector_index is None or self.feature_extractor is None:
             return []
 
         # Verificar que el archivo existe
         if not os.path.exists(query_file):
-            print(f"DEBUG MultimediaIndex: Archivo no encontrado: {query_file}")
             return []
 
         try:
             # Extraer características del archivo de consulta directamente
-            print(f"DEBUG MultimediaIndex: Extrayendo características de {query_file}")
             qvec = self.feature_extractor.extract(query_file)
 
             if qvec is None:
-                print("DEBUG MultimediaIndex: feature_extractor.extract() retornó None")
                 return []
-
-            print(
-                f"DEBUG MultimediaIndex: Vector extraído correctamente, dimensión: {len(qvec) if hasattr(qvec, '__len__') else 'unknown'}"
-            )
 
             # Verificar que hay vectores en el índice
             vector_count = (
@@ -147,27 +122,15 @@ class MultimediaIndex(IndexBase):
                 if hasattr(self.vector_index, "vector_index")
                 else 0
             )
-            print(f"DEBUG MultimediaIndex: Vectores en índice: {vector_count}")
 
             if vector_count == 0:
-                print("DEBUG MultimediaIndex: No hay vectores en el índice")
                 return []
 
             # Ejecutar búsqueda KNN
-            print(f"DEBUG MultimediaIndex: Ejecutando search_knn en VectorIndex")
             results = self.vector_index.search_knn(qvec, k)
-            print(f"DEBUG MultimediaIndex: search_knn retornó: {results}")
-            print(
-                f"DEBUG MultimediaIndex: Número de resultados: {len(results) if results else 0}"
-            )
-
             return results
 
         except Exception as e:
-            print(f"DEBUG MultimediaIndex: Error en knn_search: {e}")
-            import traceback
-
-            traceback.print_exc()
             return []
 
     def get_all(self):
