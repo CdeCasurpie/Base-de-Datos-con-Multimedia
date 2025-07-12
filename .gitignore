@@ -1,5 +1,6 @@
 # --- Entornos virtuales ---
 .venv/
+venv310/
 venv/
 ENV/
 env/

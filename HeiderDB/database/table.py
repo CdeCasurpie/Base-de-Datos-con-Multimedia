@@ -22,6 +22,8 @@ class Table:
         "POLYGON": {"variable": True, "spatial": True},
         "LINESTRING": {"variable": True, "spatial": True},
         "GEOMETRY": {"variable": True, "spatial": True},
+        "IMAGE": {"variable": True, "multimedia": True},
+        "AUDIO": {"variable": True, "multimedia": True},
     }
 
     def _get_single_data_pack_string(self, col_type):
@@ -33,7 +35,11 @@ class Table:
                     return f"{size}s"
                 elif col_type in ["POINT", "POLYGON", "LINESTRING", "GEOMETRY"]:
                     # Para tipos espaciales, usar un tamaño fijo para WKT
-                    return "500s"  # 200 caracteres para WKT
+                    return "500s"  # 200 caracteres para WK
+                elif col_type == "IMAGE":
+                    return "255s"
+                elif col_type == "AUDIO":
+                    return "255s"
             else:
                 return self.DATA_TYPES[col_type]["format"]
         elif col_type.startswith("VARCHAR"):

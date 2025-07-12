@@ -5,12 +5,15 @@ WORKDIR /app
 COPY requirements-base.txt .
 COPY requirements-tf.txt .
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-base.txt
-
-RUN pip install --no-cache-dir -r requirements-tf.txt && \
+# Instalamos dependencias del sistema antes de limpiar apt
+RUN apt-get update && \
+    apt-get install -y libgl1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-base.txt && \
+    pip install --no-cache-dir -r requirements-tf.txt
 
 COPY . .
 
