@@ -4,10 +4,12 @@ import struct
 import pickle
 from HeiderDB.database.indexes.b_plus import BPlusTree
 from HeiderDB.database.indexes.isam_sparse import ISAMSparseIndex
-from HeiderDB.database.indexes.extendible_hash import ExtendibleHash   
+from HeiderDB.database.indexes.extendible_hash import ExtendibleHash
 from HeiderDB.database.indexes.sequential_file import SequentialFile
 from HeiderDB.database.indexes.r_tree import RTreeIndex
 from HeiderDB.database.indexes.inverted_index import InvertedIndex
+from HeiderDB.database.indexes.multimedia_index import MultimediaIndex
+
 
 class Table:
     DATA_TYPES = {
@@ -21,7 +23,6 @@ class Table:
         "LINESTRING": {"variable": True, "spatial": True},
         "GEOMETRY": {"variable": True, "spatial": True},
     }
-
 
     def _get_single_data_pack_string(self, col_type):
         """Returns the pack string for a single data type."""
@@ -40,7 +41,7 @@ class Table:
             return f"{size}s"
         else:
             raise ValueError(f"Unsupported data type: {col_type}")
-        
+
     def __init__(
         self,
         name,
@@ -68,7 +69,7 @@ class Table:
         self.text_columns = text_columns or []
         self.text_indexes = {}
         self.spatial_indexes = {}
-
+        self.indexes = {}
 
         # el pack string es el que se usa para serializar los datos:
         self.pack_string = "".join(
@@ -134,14 +135,15 @@ class Table:
         table.record_count = metadata.get("record_count", 0)
         table.spatial_columns = metadata.get("spatial_columns", [])
         table.text_columns = metadata.get("text_columns", [])
-
+        table.indexes = {}
         # Create index
         table._create_primary_index()
         table._create_spatial_indexes()
         table._create_text_indexes()
+        table._create_multimedia_indexes()
 
         return table
-    
+
     def _create_text_indexes(self):
         """Crea índices de texto para las columnas especificadas."""
         for column in self.text_columns:
@@ -157,8 +159,6 @@ class Table:
                     )
                     print(f"Índice de texto creado para columna: {column}")
 
-                    
-    
     def _create_primary_index(self):
         """
         This method will create the index for the table based on the specified index type.
@@ -169,7 +169,7 @@ class Table:
                 column_name=self.primary_key,
                 data_path=self.data_path,
                 table_ref=self,
-                page_size=self.page_size
+                page_size=self.page_size,
             )
         elif self.index_type == "extendible_hash":
             self.index = ExtendibleHash(
@@ -177,15 +177,15 @@ class Table:
                 column_name=self.primary_key,
                 data_path=self.data_path,
                 table_ref=self,
-                page_size=self.page_size
-            )      
+                page_size=self.page_size,
+            )
         elif self.index_type == "isam_sparse":
             self.index = ISAMSparseIndex(
                 table_name=self.name,
                 column_name=self.primary_key,
                 data_path=self.data_path,
                 table_ref=self,
-                page_size=self.page_size
+                page_size=self.page_size,
             )
         elif self.index_type == "sequential" or self.index_type == "sequential_file":
             self.index = SequentialFile(
@@ -193,9 +193,9 @@ class Table:
                 column_name=self.primary_key,
                 data_path=self.data_path,
                 table_ref=self,
-                page_size=self.page_size
+                page_size=self.page_size,
             )
-    
+
     def _save_metadata(self):
         """
         Save the table metadata to a JSON file.
@@ -228,7 +228,6 @@ class Table:
 
         for record in data:
             self.add(record)
-
 
     def _get_record_size(self):
         return struct.calcsize(self.pack_string)
@@ -307,7 +306,7 @@ class Table:
                 except Exception as e:
                     print(f"Error adding spatial index for {column}: {e}")
 
-        for column, text_index in getattr(self, 'text_indexes', {}).items():
+        for column, text_index in getattr(self, "text_indexes", {}).items():
             if column in record:
                 try:
                     text_index.add(record, primary_key_value)
@@ -337,7 +336,7 @@ class Table:
             raise ValueError(
                 f"Can only remove records by primary key ({self.primary_key})"
             )
-        
+
         # buscar
         existing_record = self.search(self.primary_key, value)
         if not existing_record:
@@ -652,6 +651,20 @@ class Table:
         )
         print(f"Índice invertido creado para la tabla: {self.name}")
 
+    def _create_multimedia_indexes(self):
+        multimedia_columns = getattr(self, "multimedia_columns", [])
+        for column in multimedia_columns:
+            if column in self.columns:
+                self.indexes[column] = MultimediaIndex(
+                    self.name,
+                    column,
+                    self.data_path,
+                    self,
+                    self.page_size,
+                )
+                self.indexes[column].initialize("image")
+                print(f"Multimedia index created for column: {column}")
+
     def add(self, record):
         # Validate record structure
         for col_name in self.columns:
@@ -685,6 +698,13 @@ class Table:
                 except Exception as e:
                     print(f"Error adding text index for {column}: {e}")
 
+        for column, multimedia_index in self.indexes.items():
+            if column in record:
+                try:
+                    multimedia_index.add(record, primary_key_value)
+                except Exception as e:
+                    print(f"Error adding multimedia index for {column}: {e}")
+
         # Update record count
         self.record_count += 1
 
@@ -708,7 +728,7 @@ class Table:
             raise ValueError(
                 f"Can only remove records by primary key ({self.primary_key})"
             )
-        
+
         # buscar
         existing_record = self.search(self.primary_key, value)
         if not existing_record:
@@ -727,6 +747,12 @@ class Table:
                 text_index.remove(value)
             except Exception as e:
                 print(f"Warning: Error removing from text index: {e}")
+
+        for multimedia_index in self.indexes.values():
+            try:
+                multimedia_index.remove(value)
+            except Exception as e:
+                print(f"Warning: Error removing from multimedia index: {e}")
 
         # Remove the record from the primary index
         try:
@@ -770,3 +796,26 @@ class Table:
         for column, text_index in self.text_indexes.items():
             stats[column] = text_index.get_stats()
         return stats
+
+    def create_index(self, column_name, index_type, **opts):
+        ALLOWED_TYPES = ["bplus_tree", "extendible_hash", "sequential", "multimedia"]
+
+        if index_type not in ALLOWED_TYPES:
+            raise ValueError(f"Index type {index_type} not supported")
+
+        if column_name not in self.columns:
+            raise ValueError(f"Column {column_name} not found in table")
+
+        if index_type == "multimedia":
+            idx = MultimediaIndex(
+                self.name,
+                column_name,
+                self.data_path,
+                self,
+                self.page_size,
+            )
+            idx.initialize(opts.get("media_type", "image"))
+            self.indexes[column_name] = idx
+            return idx
+        else:
+            raise NotImplementedError(f"Index type {index_type} not implemented yet")

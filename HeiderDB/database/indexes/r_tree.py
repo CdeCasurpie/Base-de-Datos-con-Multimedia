@@ -7,6 +7,7 @@ from shapely.wkt import loads as wkt_loads
 import json
 from HeiderDB.database.index_base import IndexBase
 
+
 class RTreeIndex(IndexBase):
     def __init__(self, table_name, column_name, data_path, table_ref, page_size=4096):
         """
@@ -196,10 +197,10 @@ class RTreeIndex(IndexBase):
             if item.id == spatial_id:
                 return item.object
         return None
-    
+
     def search(self, key):
         return self.search_by_id(key)
-    
+
     def count(self):
         return len(self.record_id_to_spatial_id)
 
