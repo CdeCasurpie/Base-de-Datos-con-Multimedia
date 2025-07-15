@@ -113,18 +113,6 @@ print(response)
 response = client.send_query("SELECT * FROM lugares WHERE ubicacion WITHIN ((10, 20), 5.0)")
 print(response)
 ```
-
-### Aplicación de Prueba
-
-Para ejecutar la aplicación de demostración:
-```bash
-python -m TestApp.main
-```
-
-<div style="color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem; font-size: 1.5em; font-weight: bold; margin-bottom:1rem">Ejecutar Tests</div>
-
-**Nota:** Los tests requieren dependencias instaladas localmente (recomendado Python 3.10+)
-
 ## Implementación del Índice Invertido y Multimedial
 
 Para esta implementación se desarrollaron dos nuevos tipos de índices junto con una clase adicional de almacenamiento de datos multimediales:
@@ -158,6 +146,17 @@ En lugar de guardar directamente los bits de los archivos en la base de datos o 
 
 Este enfoque permite un uso eficiente de los recursos y facilita la gestión de los datos sin sobrecargar la base de datos ni la memoria del sistema.
 
+
+### Aplicación de Prueba
+
+Para ejecutar la aplicación de demostración:
+```bash
+python -m TestApp.main
+```
+
+<div style="color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem; font-size: 1.5em; font-weight: bold; margin-bottom:1rem">Ejecutar Tests</div>
+
+**Nota:** Los tests requieren dependencias instaladas localmente (recomendado Python 3.10+)
 ### Tests de estructuras de índices:
 ```bash
 python -m HeiderDB.test.test_btree          # B+ Tree
