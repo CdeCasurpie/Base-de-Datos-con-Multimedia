@@ -361,11 +361,7 @@ def parse_query(query):
             "error_location": "Parser internal error",
             "query": query,
         }
-
-
-# Añadir estas funciones al final del archivo, antes de parse_where_clause
-
-
+    
 def parse_create_multimedia_index(query):
     """
     Parsea CREATE MULTIMEDIA INDEX idx_name ON table (column) WITH TYPE media_type [METHOD method]
