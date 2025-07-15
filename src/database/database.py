@@ -404,6 +404,47 @@ class Database:
                 success, message = self.drop_table(table_name)
                 return message, not success
             
+            # CREATE INVERTED INDEX
+            elif query_type == 'CREATE_INVERTED_INDEX':
+                table_name = parsed['table_name']
+                column_name = parsed['column_name']
+                
+                if table_name not in self.tables:
+                    return None, f"Tabla '{table_name}' no encontrada"
+                
+                table = self.tables[table_name]
+                
+                if column_name not in table.columns:
+                    return None, f"Columna '{column_name}' no encontrada en tabla '{table_name}'"
+                
+                # Verificar que es un tipo de texto válido (VARCHAR)
+                col_type = table.columns[column_name]
+                if not col_type.startswith("VARCHAR"):
+                    return None, f"La columna '{column_name}' no es un tipo de texto válido (VARCHAR)"
+                
+                # Crear el índice invertido
+                try:
+                    from database.indexes.inverted_index import InvertedIndex
+                    
+                    table.text_indexes = getattr(table, 'text_indexes', {})
+                    table.text_indexes[column_name] = InvertedIndex(
+                        table_name=table_name,
+                        column_name=column_name,
+                        data_path=table.data_path,
+                        table_ref=table,
+                        page_size=table.page_size
+                    )
+                    
+                    # Indexar todos los registros existentes
+                    for record in table.get_all():
+                        primary_key_value = record.get(table.primary_key)
+                        if primary_key_value is not None:
+                            table.text_indexes[column_name].add(record, primary_key_value)
+                            
+                    return f"Índice invertido creado para '{column_name}'", None
+                except Exception as e:
+                    return None, f"Error al crear índice invertido: {str(e)}"
+                
             # CREATE SPATIAL INDEX
             elif query_type == 'CREATE_SPATIAL_INDEX':
                 table_name = parsed['table_name']

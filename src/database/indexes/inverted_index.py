@@ -163,7 +163,7 @@ class InvertedIndex(IndexBase):
         
         if isinstance(query, int) or isinstance(query, float):
             # Si es un valor numérico, buscar por ID primario directamente
-            return self.table_ref.search(query)
+            return self.table_ref.search(self.table_ref.primary_key, query)
         
         if not isinstance(query, str):
             return None
@@ -434,7 +434,8 @@ class InvertedIndex(IndexBase):
         # Recuperar documentos completos
         results = []
         for doc_id in doc_ids:
-            doc = self.table_ref.search(doc_id)
+            # Corregir la llamada para pasar el nombre de la columna primaria
+            doc = self.table_ref.search(self.table_ref.primary_key, doc_id)
             if doc:
                 results.append(doc)
                 
@@ -498,7 +499,8 @@ class InvertedIndex(IndexBase):
         # Recuperar documentos completos
         results = []
         for doc_id in final_ids:
-            doc = self.table_ref.search(doc_id)
+            # Corregir para incluir el nombre de la columna primaria
+            doc = self.table_ref.search(self.table_ref.primary_key, doc_id)
             if doc:
                 results.append(doc)
                 
@@ -570,7 +572,8 @@ class InvertedIndex(IndexBase):
         # Recuperar documentos completos
         results = []
         for doc_id, score in top_k_docs:
-            doc = self.table_ref.search(doc_id)
+            # Corregir para incluir el nombre de la columna primaria
+            doc = self.table_ref.search(self.table_ref.primary_key, doc_id)
             if doc:
                 # Opcionalmente añadir la puntuación al documento
                 doc['_score'] = score

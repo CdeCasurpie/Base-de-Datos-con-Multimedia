@@ -90,6 +90,22 @@ def parse_query(query):
                 'error_message': None
             }
             
+        # CREATE INVERTED INDEX
+        create_inverted_index_pattern = r'''
+            CREATE\s+INVERTED\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(\s*(\w+)\s*\)
+            \s*;?$
+        '''
+        
+        match = re.match(create_inverted_index_pattern, query, re.IGNORECASE | re.VERBOSE)
+        if match:
+            return {
+                'type': 'CREATE_INVERTED_INDEX',
+                'index_name': match.group(1),
+                'table_name': match.group(2),
+                'column_name': match.group(3),
+                'error_message': None
+            }
+
         # CREATE SPATIAL INDEX
         spatial_index_pattern = r'''
             CREATE\s+SPATIAL\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(\s*(\w+)\s*\)
