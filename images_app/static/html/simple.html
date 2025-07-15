@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Similitud de Imágenes</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        background: linear-gradient(45deg, #000000, #1a0000, #000033);
+        min-height: 100vh;
+        color: #ffffff;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+
+      h1 {
+        font-size: 3rem;
+        background: linear-gradient(45deg, #ff0040, #00ccff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 10px;
+      }
+
+      .card {
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #ff0040;
+        border-radius: 20px;
+        padding: 30px;
+        margin: 20px 0;
+        box-shadow: 0 10px 30px rgba(255, 0, 64, 0.3);
+      }
+
+      .upload-area {
+        border: 2px dashed #00ccff;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        margin: 20px 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .upload-area:hover {
+        border-color: #ff0040;
+        background: rgba(255, 0, 64, 0.1);
+      }
+
+      .upload-area.dragover {
+        border-color: #00ff00;
+        background: rgba(0, 255, 0, 0.1);
+      }
+
+      .btn {
+        background: linear-gradient(45deg, #ff0040, #cc0033);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 30px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(255, 0, 64, 0.4);
+        margin: 10px;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 0, 64, 0.6);
+      }
+
+      .btn-secondary {
+        background: linear-gradient(45deg, #00ccff, #0099cc);
+        box-shadow: 0 5px 15px rgba(0, 204, 255, 0.4);
+      }
+
+      .preview-container {
+        display: none;
+        margin: 20px 0;
+        text-align: center;
+      }
+
+      .preview-image {
+        max-width: 300px;
+        max-height: 300px;
+        border-radius: 10px;
+        border: 2px solid #00ccff;
+      }
+
+      .results-container {
+        display: none;
+        margin-top: 30px;
+      }
+
+      .result-item {
+        display: flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #00ccff;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        transition: transform 0.3s ease;
+      }
+
+      .result-item:hover {
+        transform: translateX(5px);
+        border-color: #ff0040;
+      }
+
+      .result-image {
+        width: 80px;
+        height: 80px;
+        border-radius: 10px;
+        object-fit: cover;
+        margin-right: 15px;
+        border: 2px solid #00ccff;
+      }
+
+      .result-info {
+        flex-grow: 1;
+      }
+
+      .result-name {
+        font-weight: bold;
+        color: #ffffff;
+        margin-bottom: 5px;
+      }
+
+      .result-similarity {
+        color: #00ccff;
+        font-size: 0.9rem;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+      }
+
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid #00ccff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .status {
+        margin: 20px 0;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+        display: none;
+      }
+
+      .status.success {
+        background: rgba(0, 255, 0, 0.1);
+        border: 2px solid #00ff00;
+        color: #00ff00;
+      }
+
+      .status.error {
+        background: rgba(255, 0, 0, 0.1);
+        border: 2px solid #ff0040;
+        color: #ff0040;
+      }
+
+      .endpoints-info {
+        background: rgba(0, 204, 255, 0.1);
+        border: 1px solid #00ccff;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+
+      .endpoint-item {
+        margin: 10px 0;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Sistema de Similitud de Imágenes</h1>
+        <p style="color: #00ccff; font-size: 1.2rem">
+          Encuentra imágenes similares usando HeiderDB
+        </p>
+      </div>
+
+      <div class="card">
+        <h2 style="color: #00ccff; margin-bottom: 20px">
+          Buscar Imágenes Similares
+        </h2>
+
+        <div
+          class="upload-area"
+          id="uploadArea"
+          onclick="document.getElementById('fileInput').click()"
+        >
+          <p style="color: #00ccff; font-size: 1.2rem">
+            📷 Haz clic aquí o arrastra una imagen
+          </p>
+          <p style="color: #ffffff; margin-top: 10px">
+            Formatos soportados: JPG, PNG, BMP, TIFF, WEBP
+          </p>
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            style="display: none"
+          />
+        </div>
+
+        <div class="preview-container" id="previewContainer">
+          <h3 style="color: #00ccff">Imagen Seleccionada:</h3>
+          <img id="previewImage" class="preview-image" alt="Preview" />
+          <div>
+            <button class="btn" onclick="analyzeImage()">
+              🔍 Buscar Similares
+            </button>
+            <button class="btn btn-secondary" onclick="clearSelection()">
+              🗑️ Limpiar
+            </button>
+          </div>
+        </div>
+
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <p>Analizando imagen y buscando similares...</p>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="results-container" id="resultsContainer">
+          <h3 style="color: #00ccff; margin-bottom: 20px">
+            Resultados de Similitud:
+          </h3>
+          <div id="results"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="color: #00ccff; margin-bottom: 20px">Estado del Sistema</h2>
+
+        <div class="endpoints-info">
+          <h3 style="color: #ffffff; margin-bottom: 15px">
+            Endpoints Disponibles:
+          </h3>
+          <div class="endpoint-item">
+            <strong>GET /api/health</strong> - Estado del servidor
+            <button
+              class="btn btn-secondary"
+              onclick="testHealth()"
+              style="margin-left: 10px; padding: 5px 15px; font-size: 0.8rem"
+            >
+              Probar
+            </button>
+          </div>
+          <div class="endpoint-item">
+            <strong>GET /api/test-db</strong> - Probar conexión a base de datos
+            <button
+              class="btn btn-secondary"
+              onclick="testDatabase()"
+              style="margin-left: 10px; padding: 5px 15px; font-size: 0.8rem"
+            >
+              Probar
+            </button>
+          </div>
+          <div class="endpoint-item">
+            <strong>POST /api/analyze-similarity</strong> - Analizar similitud
+            de imagen
+          </div>
+          <div class="endpoint-item">
+            <strong>GET /api/list-images</strong> - Listar todas las imágenes
+            <button
+              class="btn btn-secondary"
+              onclick="listImages()"
+              style="margin-left: 10px; padding: 5px 15px; font-size: 0.8rem"
+            >
+              Probar
+            </button>
+          </div>
+        </div>
+
+        <div id="systemStatus" class="status"></div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:5001";
+      let selectedFile = null;
+
+      // Event listeners
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", handleFileSelect);
+
+      // Drag and drop functionality
+      const uploadArea = document.getElementById("uploadArea");
+      uploadArea.addEventListener("dragover", handleDragOver);
+      uploadArea.addEventListener("dragleave", handleDragLeave);
+      uploadArea.addEventListener("drop", handleDrop);
+
+      function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+          selectedFile = file;
+          showPreview(file);
+        }
+      }
+
+      function handleDragOver(event) {
+        event.preventDefault();
+        uploadArea.classList.add("dragover");
+      }
+
+      function handleDragLeave(event) {
+        event.preventDefault();
+        uploadArea.classList.remove("dragover");
+      }
+
+      function handleDrop(event) {
+        event.preventDefault();
+        uploadArea.classList.remove("dragover");
+
+        const file = event.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) {
+          selectedFile = file;
+          showPreview(file);
+          document.getElementById("fileInput").files = event.dataTransfer.files;
+        }
+      }
+
+      function showPreview(file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          document.getElementById("previewImage").src = e.target.result;
+          document.getElementById("previewContainer").style.display = "block";
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function clearSelection() {
+        selectedFile = null;
+        document.getElementById("fileInput").value = "";
+        document.getElementById("previewContainer").style.display = "none";
+        document.getElementById("resultsContainer").style.display = "none";
+        hideStatus();
+      }
+
+      async function analyzeImage() {
+        if (!selectedFile) {
+          showStatus("Por favor selecciona una imagen primero", "error");
+          return;
+        }
+
+        showLoading(true);
+        hideStatus();
+
+        try {
+          const formData = new FormData();
+          formData.append("image", selectedFile);
+
+          const response = await fetch(`${API_BASE}/api/analyze-similarity`, {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            if (result.results && result.results.length > 0) {
+              displayResults(result.results);
+              showStatus(
+                `Se encontraron ${result.results.length} imágenes similares`,
+                "success"
+              );
+            } else {
+              showStatus("No se encontraron imágenes similares", "error");
+              document.getElementById("resultsContainer").style.display =
+                "none";
+            }
+          } else {
+            showStatus(
+              `Error: ${result.error || "Error desconocido"}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          showStatus(`Error de conexión: ${error.message}`, "error");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function displayResults(results) {
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML = "";
+
+        results.forEach((result) => {
+          const resultItem = document.createElement("div");
+          resultItem.className = "result-item";
+
+          resultItem.innerHTML = `
+                    <img src="${result.imagePath}" alt="${result.name}" class="result-image">
+                    <div class="result-info">
+                        <div class="result-name">${result.name}</div>
+                        <div class="result-similarity">Similitud: ${result.similarity}%</div>
+                    </div>
+                `;
+
+          resultsDiv.appendChild(resultItem);
+        });
+
+        document.getElementById("resultsContainer").style.display = "block";
+      }
+
+      async function testHealth() {
+        try {
+          const response = await fetch(`${API_BASE}/api/health`);
+          const result = await response.json();
+          showSystemStatus(`✅ Servidor: ${result.message}`, "success");
+        } catch (error) {
+          showSystemStatus(`❌ Error de conexión: ${error.message}`, "error");
+        }
+      }
+
+      async function testDatabase() {
+        try {
+          const response = await fetch(`${API_BASE}/api/test-db`);
+          const result = await response.json();
+
+          if (response.ok) {
+            showSystemStatus(
+              `✅ Base de datos conectada correctamente`,
+              "success"
+            );
+          } else {
+            showSystemStatus(`⚠️ Problema con BD: ${result.message}`, "error");
+          }
+        } catch (error) {
+          showSystemStatus(
+            `❌ Error conectando a BD: ${error.message}`,
+            "error"
+          );
+        }
+      }
+
+      async function listImages() {
+        try {
+          const response = await fetch(`${API_BASE}/api/list-images`);
+          const result = await response.json();
+
+          if (response.ok) {
+            showSystemStatus(
+              `✅ Base de datos respondió correctamente`,
+              "success"
+            );
+          } else {
+            showSystemStatus(
+              `⚠️ Error listando imágenes: ${result.message}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          showSystemStatus(`❌ Error: ${error.message}`, "error");
+        }
+      }
+
+      function showStatus(message, type) {
+        const status = document.getElementById("status");
+        status.textContent = message;
+        status.className = `status ${type}`;
+        status.style.display = "block";
+
+        setTimeout(() => {
+          hideStatus();
+        }, 5000);
+      }
+
+      function showSystemStatus(message, type) {
+        const status = document.getElementById("systemStatus");
+        status.textContent = message;
+        status.className = `status ${type}`;
+        status.style.display = "block";
+
+        setTimeout(() => {
+          status.style.display = "none";
+        }, 5000);
+      }
+
+      function hideStatus() {
+        document.getElementById("status").style.display = "none";
+      }
+
+      function showLoading(show) {
+        document.getElementById("loading").style.display = show
+          ? "block"
+          : "none";
+      }
+
+      // Test connection on page load
+      window.addEventListener("load", () => {
+        testHealth();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Análisis Facial - A quién me parezco</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        background: linear-gradient(45deg, #000000, #1a0000, #000033);
+        min-height: 100vh;
+        color: #ffffff;
+        overflow-x: hidden;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+        position: relative;
+      }
+
+      h1 {
+        font-size: 3rem;
+        background: linear-gradient(45deg, #ff0040, #00ccff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 0 20px rgba(255, 0, 64, 0.5);
+        margin-bottom: 10px;
+      }
+
+      .subtitle {
+        font-size: 1.2rem;
+        color: #00ccff;
+        opacity: 0.8;
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        margin-bottom: 40px;
+      }
+
+      .card {
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #ff0040;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(255, 0, 64, 0.3);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #ff0040, #00ccff, #ff0040);
+        animation: glow 2s ease-in-out infinite;
+      }
+
+      @keyframes glow {
+        0%,
+        100% {
+          opacity: 0.5;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      .card h2 {
+        color: #00ccff;
+        margin-bottom: 20px;
+        font-size: 1.8rem;
+      }
+
+      .camera-container {
+        position: relative;
+        width: 100%;
+        height: 300px;
+        background: #000;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 20px 0;
+        border: 2px solid #00ccff;
+      }
+
+      .camera-container.active {
+        border-color: #00ff00;
+        box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+      }
+
+      .camera-container.recording {
+        border-color: #ff0040;
+        box-shadow: 0 0 15px rgba(255, 0, 64, 0.5);
+        animation: recordingPulse 1s ease-in-out infinite;
+      }
+
+      @keyframes recordingPulse {
+        0%,
+        100% {
+          box-shadow: 0 0 15px rgba(255, 0, 64, 0.5);
+        }
+        50% {
+          box-shadow: 0 0 25px rgba(255, 0, 64, 0.8);
+        }
+      }
+
+      #video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .btn {
+        background: linear-gradient(45deg, #ff0040, #cc0033);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 30px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(255, 0, 64, 0.4);
+        margin: 10px;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 0, 64, 0.6);
+      }
+
+      .btn-secondary {
+        background: linear-gradient(45deg, #00ccff, #0099cc);
+        box-shadow: 0 5px 15px rgba(0, 204, 255, 0.4);
+      }
+
+      .btn-secondary:hover {
+        box-shadow: 0 8px 25px rgba(0, 204, 255, 0.6);
+      }
+
+      .input-group {
+        margin: 20px 0;
+      }
+
+      .input-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #00ccff;
+        font-weight: bold;
+      }
+
+      .input-group input {
+        width: 100%;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid #00ccff;
+        border-radius: 10px;
+        color: white;
+        font-size: 1rem;
+      }
+
+      .input-group input:focus {
+        outline: none;
+        border-color: #ff0040;
+        box-shadow: 0 0 10px rgba(255, 0, 64, 0.5);
+      }
+
+      .status {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+      }
+
+      .status.success {
+        background: rgba(0, 255, 0, 0.1);
+        border: 2px solid #00ff00;
+        color: #00ff00;
+      }
+
+      .status.error {
+        background: rgba(255, 0, 0, 0.1);
+        border: 2px solid #ff0040;
+        color: #ff0040;
+      }
+
+      .status.info {
+        background: rgba(0, 204, 255, 0.1);
+        border: 2px solid #00ccff;
+        color: #00ccff;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid #00ccff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin: 20px 0;
+      }
+
+      .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: rgba(0, 204, 255, 0.1);
+        border: 1px solid #00ccff;
+        border-radius: 10px;
+      }
+
+      .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #00ccff;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        color: #ffffff;
+        margin-top: 5px;
+      }
+
+      .similarity-results {
+        margin-top: 20px;
+      }
+
+      .similarity-item {
+        display: flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #00ccff;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        transition: transform 0.3s ease;
+      }
+
+      .similarity-item:hover {
+        transform: translateX(5px);
+        border-color: #ff0040;
+      }
+
+      .similarity-image {
+        width: 80px;
+        height: 80px;
+        border-radius: 10px;
+        object-fit: cover;
+        margin-right: 15px;
+        border: 2px solid #00ccff;
+      }
+
+      .similarity-info {
+        flex-grow: 1;
+      }
+
+      .similarity-name {
+        font-weight: bold;
+        color: #ffffff;
+        margin-bottom: 5px;
+      }
+
+      .similarity-score {
+        color: #00ccff;
+        font-size: 0.9rem;
+      }
+
+      .similarity-confidence {
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-left: 15px;
+      }
+
+      .confidence-high {
+        background: rgba(0, 255, 0, 0.2);
+        color: #00ff00;
+        border: 1px solid #00ff00;
+      }
+
+      .confidence-medium {
+        background: rgba(255, 204, 0, 0.2);
+        color: #ffcc00;
+        border: 1px solid #ffcc00;
+      }
+
+      .confidence-low {
+        background: rgba(255, 0, 64, 0.2);
+        color: #ff0040;
+        border: 1px solid #ff0040;
+      }
+
+      .database-info {
+        text-align: center;
+        padding: 20px;
+        background: rgba(0, 204, 255, 0.1);
+        border: 1px solid #00ccff;
+        border-radius: 10px;
+        margin-bottom: 20px;
+      }
+
+      @media (max-width: 768px) {
+        .main-content {
+          grid-template-columns: 1fr;
+        }
+        h1 {
+          font-size: 2rem;
+        }
+        .card {
+          padding: 20px;
+        }
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+        .similarity-item {
+          flex-direction: column;
+          text-align: center;
+        }
+        .similarity-image {
+          margin-right: 0;
+          margin-bottom: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>A QUIEN ME PAREZCO</h1>
+        <p class="subtitle">Sistema de Análisis Facial con IA</p>
+      </div>
+
+      <div class="main-content">
+        <div class="card">
+          <h2>Registrar Mi Rostro</h2>
+          <div class="camera-container">
+            <video id="video" autoplay></video>
+          </div>
+
+          <div class="input-group">
+            <label for="nameInput">Tu Nombre:</label>
+            <input type="text" id="nameInput" placeholder="Ingresa tu nombre" />
+          </div>
+
+          <button class="btn" onclick="startCamera()">Iniciar Cámara</button>
+          <button class="btn btn-secondary" onclick="captureAndRegister()">
+            Registrar Mi Rostro
+          </button>
+
+          <div class="loading" id="registerLoading">
+            <div class="spinner"></div>
+            <p>Procesando tu rostro...</p>
+          </div>
+
+          <div id="registerStatus" class="status" style="display: none"></div>
+        </div>
+
+        <div class="card">
+          <h2>Mis Estadísticas</h2>
+          <div id="userStats" style="display: none">
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-value" id="statVectorSize">0</div>
+                <div class="stat-label">Características Faciales</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value" id="statDbSize">0</div>
+                <div class="stat-label">Rostros en Base de Datos</div>
+              </div>
+            </div>
+            <p
+              id="registrationDate"
+              style="color: #00ccff; text-align: center; margin-top: 10px"
+            ></p>
+          </div>
+
+          <div
+            id="noUserStats"
+            style="text-align: center; color: #00ccff; padding: 40px"
+          >
+            <p>Registra tu rostro primero para ver las estadísticas</p>
+          </div>
+
+          <button class="btn btn-secondary" onclick="loadUserStatistics()">
+            Actualizar Estadísticas
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Base de Datos de Rostros</h2>
+        <div class="database-info" id="databaseInfo">
+          <h3>Información de la Base de Datos</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value" id="totalImages">0</div>
+              <div class="stat-label">Imágenes Totales</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="processedImages">0</div>
+              <div class="stat-label">Imágenes Procesadas</div>
+            </div>
+          </div>
+          <p style="margin-top: 15px; color: #ffffff">
+            Coloca imágenes en la carpeta <strong>database_images</strong> para
+            analizar
+          </p>
+        </div>
+
+        <button class="btn btn-secondary" onclick="analyzeDatabase()">
+          Analizar Base de Datos
+        </button>
+        <button class="btn" onclick="loadDatabaseInfo()">
+          Cargar Información
+        </button>
+
+        <div class="loading" id="dbLoading">
+          <div class="spinner"></div>
+          <p>Analizando imágenes...</p>
+        </div>
+
+        <div id="dbStatus" class="status" style="display: none"></div>
+      </div>
+
+      <div class="card">
+        <h2>A Quién Me Parezco</h2>
+
+        <div class="input-group">
+          <label for="usernameInput">Tu Nombre (registrado):</label>
+          <input
+            type="text"
+            id="usernameInput"
+            placeholder="Nombre que registraste"
+          />
+        </div>
+
+        <button class="btn" onclick="findSimilarFaces()">
+          Buscar Parecidos
+        </button>
+
+        <div class="loading" id="similarLoading">
+          <div class="spinner"></div>
+          <p>Buscando parecidos...</p>
+        </div>
+
+        <div id="similarStatus" class="status" style="display: none"></div>
+
+        <div class="similarity-results" id="similarityResults"></div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:5001";
+      let stream = null;
+      let currentUser = null;
+
+      async function startCamera() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+          });
+          document.getElementById("video").srcObject = stream;
+          document
+            .querySelector("#video")
+            .parentElement.classList.add("active");
+          showStatus(
+            "registerStatus",
+            "Cámara iniciada correctamente",
+            "success"
+          );
+        } catch (error) {
+          showStatus(
+            "registerStatus",
+            "Error al acceder a la cámara: " + error.message,
+            "error"
+          );
+        }
+      }
+
+      function captureImage(videoElement) {
+        const canvas = document.createElement("canvas");
+        const video = document.getElementById(videoElement);
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
+        return canvas.toDataURL("image/jpeg");
+      }
+
+      async function captureAndRegister() {
+        const name = document.getElementById("nameInput").value.trim();
+
+        if (!name) {
+          showStatus("registerStatus", "Por favor ingresa tu nombre", "error");
+          return;
+        }
+
+        if (!stream) {
+          showStatus("registerStatus", "Primero inicia la cámara", "error");
+          return;
+        }
+
+        document
+          .querySelector("#video")
+          .parentElement.classList.add("recording");
+        showLoading("registerLoading", true);
+
+        try {
+          const imageData = captureImage("video");
+
+          const response = await fetch(`${API_BASE}/register_user`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: imageData, name: name }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            currentUser = name;
+            showStatus(
+              "registerStatus",
+              `Rostro registrado exitosamente para: ${result.name}`,
+              "success"
+            );
+            document.getElementById("nameInput").value = "";
+            document.getElementById("usernameInput").value = name;
+            displayUserStatistics(result.statistics);
+          } else {
+            showStatus(
+              "registerStatus",
+              "Error: " + (result.error || "Error al registrar rostro"),
+              "error"
+            );
+          }
+        } catch (error) {
+          showStatus(
+            "registerStatus",
+            "Error de conexión: " + error.message,
+            "error"
+          );
+        } finally {
+          showLoading("registerLoading", false);
+          document
+            .querySelector("#video")
+            .parentElement.classList.remove("recording");
+        }
+      }
+
+      async function loadUserStatistics() {
+        const username =
+          currentUser || document.getElementById("usernameInput").value.trim();
+
+        if (!username) {
+          showStatus(
+            "registerStatus",
+            "Ingresa tu nombre para ver estadísticas",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/user_statistics/${username}`
+          );
+          const result = await response.json();
+
+          if (response.ok) {
+            displayUserStatistics(result.statistics);
+            showStatus(
+              "registerStatus",
+              "Estadísticas actualizadas correctamente",
+              "success"
+            );
+          } else {
+            document.getElementById("userStats").style.display = "none";
+            document.getElementById("noUserStats").style.display = "block";
+            showStatus("registerStatus", "Usuario no encontrado", "error");
+          }
+        } catch (error) {
+          showStatus(
+            "registerStatus",
+            "Error al cargar estadísticas: " + error.message,
+            "error"
+          );
+        }
+      }
+
+      function displayUserStatistics(stats) {
+        document.getElementById("userStats").style.display = "block";
+        document.getElementById("noUserStats").style.display = "none";
+
+        document.getElementById("statVectorSize").textContent =
+          stats.feature_vector_size;
+        document.getElementById("statDbSize").textContent = stats.database_size;
+
+        const date = new Date(stats.registration_date).toLocaleString();
+        document.getElementById(
+          "registrationDate"
+        ).textContent = `Registrado: ${date}`;
+      }
+
+      async function analyzeDatabase() {
+        showLoading("dbLoading", true);
+
+        try {
+          const response = await fetch(`${API_BASE}/analyze_database`, {
+            method: "POST",
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            showStatus(
+              "dbStatus",
+              `Base de datos analizada: ${result.processed} nuevas imágenes procesadas`,
+              "success"
+            );
+            loadDatabaseInfo();
+          } else {
+            showStatus(
+              "dbStatus",
+              "Error: " + (result.error || "Error al analizar base de datos"),
+              "error"
+            );
+          }
+        } catch (error) {
+          showStatus(
+            "dbStatus",
+            "Error de conexión: " + error.message,
+            "error"
+          );
+        } finally {
+          showLoading("dbLoading", false);
+        }
+      }
+
+      async function loadDatabaseInfo() {
+        try {
+          const response = await fetch(`${API_BASE}/database_info`);
+          const result = await response.json();
+
+          if (response.ok) {
+            document.getElementById("totalImages").textContent =
+              result.total_database_images;
+            document.getElementById("processedImages").textContent =
+              result.total_database_features;
+          }
+        } catch (error) {
+          showStatus(
+            "dbStatus",
+            "Error al cargar información: " + error.message,
+            "error"
+          );
+        }
+      }
+
+      async function findSimilarFaces() {
+        const username = document.getElementById("usernameInput").value.trim();
+
+        if (!username) {
+          showStatus("similarStatus", "Ingresa tu nombre registrado", "error");
+          return;
+        }
+
+        showLoading("similarLoading", true);
+
+        try {
+          const response = await fetch(`${API_BASE}/who_do_i_look_like`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username, top_n: 5 }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            displaySimilarityResults(result.similar_faces);
+            showStatus(
+              "similarStatus",
+              `Encontrados ${result.total_found} parecidos para ${result.username}`,
+              "success"
+            );
+          } else {
+            showStatus(
+              "similarStatus",
+              "Error: " + (result.error || "Error al buscar parecidos"),
+              "error"
+            );
+          }
+        } catch (error) {
+          showStatus(
+            "similarStatus",
+            "Error de conexión: " + error.message,
+            "error"
+          );
+        } finally {
+          showLoading("similarLoading", false);
+        }
+      }
+
+      function displaySimilarityResults(similarities) {
+        const container = document.getElementById("similarityResults");
+
+        if (similarities.length === 0) {
+          container.innerHTML =
+            '<p style="color: #00ccff; text-align: center;">No se encontraron parecidos</p>';
+          return;
+        }
+
+        container.innerHTML = similarities
+          .map(
+            (sim, index) => `
+          <div class="similarity-item">
+            ${
+              sim.image_base64
+                ? `<img src="${sim.image_base64}" alt="${sim.name}" class="similarity-image" />`
+                : '<div class="similarity-image" style="background: #333; display: flex; align-items: center; justify-content: center; color: #666;">Sin imagen</div>'
+            }
+            <div class="similarity-info">
+              <div class="similarity-name">${index + 1}. ${sim.name}</div>
+              <div class="similarity-score">
+                Similitud: ${(sim.similarity * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div class="similarity-confidence confidence-${sim.confidence}">
+              ${sim.confidence.toUpperCase()}
+            </div>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function showStatus(elementId, message, type) {
+        const element = document.getElementById(elementId);
+        element.className = `status ${type}`;
+        element.textContent = message;
+        element.style.display = "block";
+
+        setTimeout(() => {
+          element.style.display = "none";
+        }, 5000);
+      }
+
+      function showLoading(elementId, show) {
+        const element = document.getElementById(elementId);
+        element.className = show ? "loading show" : "loading";
+      }
+
+      window.addEventListener("beforeunload", () => {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      });
+
+      loadDatabaseInfo();
+    </script>
+  </body>
+</html>

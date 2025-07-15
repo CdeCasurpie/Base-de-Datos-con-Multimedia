@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Similitud de Imágenes</title>
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/image-interface.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div class="hero-section">
+      <div class="hero-left">
+        <div class="face-showcase">
+          <img
+            src="https://via.placeholder.com/350x450/000/fff?text=Imagen+de+Muestra"
+            alt="Imagen de muestra"
+            class="hero-face"
+            id="heroImage"
+          />
+          <div class="face-overlay">
+            <div class="detection-points">
+              <div class="point point-1"></div>
+              <div class="point point-2"></div>
+              <div class="point point-3"></div>
+              <div class="point point-4"></div>
+              <div class="point point-5"></div>
+            </div>
+            <div class="scanning-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-right">
+        <div class="header">
+          <h1 class="logo">
+            <i class="fas fa-search"></i>
+            ImageFind
+          </h1>
+          <p class="tagline">Sistema de Búsqueda por Similitud Visual</p>
+        </div>
+
+        <div class="main-content">
+          <div id="uploadSection" class="upload-section active">
+            <div class="upload-area" id="uploadArea">
+              <div class="upload-icon">
+                <i class="fas fa-cloud-upload-alt"></i>
+              </div>
+              <h3>Sube tu imagen</h3>
+              <p>Arrastra una imagen aquí o haz clic para seleccionar</p>
+              <p class="supported-formats">JPG, PNG, BMP, TIFF, WEBP</p>
+              <input
+                type="file"
+                id="imageFile"
+                accept=".jpg,.jpeg,.png,.bmp,.tiff,.webp"
+                hidden
+              />
+              <button type="button" class="upload-btn" id="selectFileBtn">
+                Seleccionar Imagen
+              </button>
+            </div>
+
+            <div id="imagePreview" class="image-preview" style="display: none">
+              <img id="previewImg" src="" alt="Vista previa" />
+              <div class="image-actions">
+                <button id="analyzeBtn" class="btn btn-primary">
+                  Buscar Similares
+                </button>
+                <button id="removeBtn" class="btn btn-secondary">
+                  Quitar Imagen
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="loadingSection" class="loading-section">
+            <div class="loading-animation">
+              <div class="scanning-grid">
+                <div class="scan-line"></div>
+                <div class="scan-line"></div>
+                <div class="scan-line"></div>
+                <div class="scan-line"></div>
+              </div>
+              <h3>Analizando imagen...</h3>
+              <p>Extrayendo características visuales y buscando similitudes</p>
+              <div class="progress-container">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-text" id="progressText">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="resultsSection" class="results-section">
+            <div class="match-result">
+              <div class="best-match" id="bestMatch"></div>
+
+              <div class="statistics" id="statisticsPanel">
+                <h3>
+                  <i class="fas fa-chart-bar"></i> Estadísticas de Análisis
+                </h3>
+                <div class="stats-grid">
+                  <div class="stat-item">
+                    <i class="fas fa-images"></i>
+                    <div class="stat-value" id="totalImages">0</div>
+                    <div class="stat-label">Imágenes Analizadas</div>
+                  </div>
+                  <div class="stat-item">
+                    <i class="fas fa-percentage"></i>
+                    <div class="stat-value" id="avgSimilarity">0%</div>
+                    <div class="stat-label">Similitud Promedio</div>
+                  </div>
+                  <div class="stat-item">
+                    <i class="fas fa-clock"></i>
+                    <div class="stat-value" id="processingTime">0ms</div>
+                    <div class="stat-label">Tiempo de Análisis</div>
+                  </div>
+                  <div class="stat-item">
+                    <i class="fas fa-eye"></i>
+                    <div class="stat-value" id="featuresCount">0</div>
+                    <div class="stat-label">Características Detectadas</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="additional-matches" id="additionalMatches">
+                <h3><i class="fas fa-list"></i> Resultados Adicionales</h3>
+                <div class="matches-list" id="matchesList"></div>
+              </div>
+
+              <div class="action-buttons">
+                <button id="backBtn" class="btn btn-secondary">
+                  <i class="fas fa-arrow-left"></i> Nueva Búsqueda
+                </button>
+                <button id="saveResultsBtn" class="btn btn-primary">
+                  <i class="fas fa-download"></i> Guardar Resultados
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="errorSection" class="error-detection" style="display: none">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Error en el análisis</h3>
+            <p id="errorMessage">
+              Ocurrió un error durante el procesamiento de la imagen
+            </p>
+            <button id="retryBtn" class="btn btn-primary">Reintentar</button>
+            <button id="backToUploadBtn" class="btn btn-secondary">
+              Volver al inicio
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="opencv-status" id="opencvStatus">
+        <div class="opencv-info">
+          <h3><i class="fas fa-cogs"></i> Estado del Sistema</h3>
+          <div class="features-grid">
+            <div class="feature-item">
+              <i class="fas fa-database"></i>
+              <div class="feature-value" id="dbStatus">Conectando...</div>
+              <div class="feature-label">Base de Datos</div>
+            </div>
+            <div class="feature-item">
+              <i class="fas fa-microchip"></i>
+              <div class="feature-value" id="engineStatus">Cargando...</div>
+              <div class="feature-label">Motor de Similitud</div>
+            </div>
+            <div class="feature-item">
+              <i class="fas fa-server"></i>
+              <div class="feature-value" id="serverStatus">Iniciando...</div>
+              <div class="feature-label">Servidor</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>
+        &copy; 2025 Sistema de Similitud de Imágenes - Tecnología de Búsqueda
+        Visual Avanzada
+      </p>
+    </div>
+
+    <script src="../js/image-handler.js"></script>
+  </body>
+</html>
