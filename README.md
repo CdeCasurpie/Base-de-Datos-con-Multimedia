@@ -126,7 +126,8 @@ Es recomendable para estructuras textuales o contenidos que requieren recuperaci
 ---
 
 ### `MultimediaIndex`
-Diseñado para manejar contenido multimedial como imágenes y audio. Este índice se divide en dos componentes principales:
+Esta clase actúa como almacén de imágenes. En lugar de guardar los archivos binarios directamente en memoria o en base de datos, se mapearon rutas absolutas a imágenes almacenadas en una carpeta específica del proyecto.
+Esto permite una gestión más ligera del contenido multimedial, evitando el almacenamiento innecesario de bits. Este índice se divide en dos componentes principales:
 
 ##### `FeatureExtractor`
 Clase **abstracta** que define la interfaz para la extracción de características.  
