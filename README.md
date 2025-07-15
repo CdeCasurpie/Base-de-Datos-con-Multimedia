@@ -270,6 +270,7 @@ SELECT * FROM documentos WHERE abstract CONTAINS 'neural networks deep learning'
 ![Grafica comparativo](grafica1.png)
 
 ## FRONTEND
+![Grafica comparativo](frontend5.jpg)
 ![Grafica comparativo](FRONTEND1.jpg)
 ![Grafica comparativo](FRONTEND2.jpg)
 ![Grafica comparativo](FRONTEND3.jpg)
