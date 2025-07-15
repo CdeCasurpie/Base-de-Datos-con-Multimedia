@@ -5,6 +5,7 @@
  <div style="font-weight: bold; color:rgb(50, 120, 252); float: right "><u style="font-size: 28px; height:70px; display:flex; flex-direction: column; justify-content: center;">Proyecto BD II | Multimedia BD</u></div>
 </div>
 
+<<<<<<< HEAD
 ## Resumen Ejecutivo
 
 **HeiderDB** es un sistema de gestión de base de datos diseñado para manejar datos multimedia y textuales de manera eficiente. Como extensión del motor de base de datos HeiderDB original, este proyecto introduce **dos nuevos tipos de índices especializados**: **Índices Invertidos** para búsqueda textual e **Índices Multimedia** para procesamiento de imágenes y audio, junto con una arquitectura cliente-servidor distribuida similar a PostgreSQL.
@@ -16,6 +17,14 @@
 - 🌐 **Arquitectura Cliente-Servidor**: Protocolo TCP personalizado compatible con aplicaciones distribuidas
 - 📊 **Múltiples Índices Primarios**: B+ Tree, Hash Extensible, ISAM, Archivo Secuencial, R-Tree
 - 🎯 **Tres Aplicaciones Frontend**: Interfaces especializadas para audio, imágenes y búsqueda bibliográfica
+=======
+## Introducción
+Este proyecto trabaja con datos de texto, imágenes y audio. Como en muchos sistemas modernos, no basta con buscar solo por palabras clave: también queremos encontrar imágenes parecidas o audios similares.
+
+Por eso, se necesita una base de datos multimodal, capaz de manejar distintos tipos de contenido y hacer búsquedas basadas en sus características internas. Esto permite una recuperación más precisa y natural, como buscar una canción por cómo suena o una imagen por su parecido visual.
+
+**HeiderDB** es una base de datos modular con soporte para índices secuenciales, B+ Trees, índices espaciales (R-Tree), e índices invertidos para texto. Incluye un servidor TCP personalizado y una API de cliente.
+>>>>>>> 95e8ba0 (Update README.md)
 
 ---
 
