@@ -51,7 +51,6 @@ class QueryPanel(QWidget):
         button_layout.addWidget(self.execute_button)
         button_layout.addWidget(self.clear_button)
         button_layout.addWidget(self.template_button)
-        button_layout.addWidget(self.examples_button)
         layout.addLayout(button_layout)
         
         # Conectar señales
