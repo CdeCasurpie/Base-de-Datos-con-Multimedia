@@ -130,6 +130,13 @@ def test_database():
 @app.route("/api/analyze-similarity", methods=["POST"])
 def analyze_similarity():
     try:
+        # Limpiar carpetas antes de cada consulta
+        shutil.rmtree(UPLOAD_FOLDER, ignore_errors=True)
+        shutil.rmtree(STATIC_FOLDER, ignore_errors=True)
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(STATIC_FOLDER, exist_ok=True)
+
+
         if "image" not in request.files:
             return jsonify({"error": "No se encontró archivo de imagen"}), 400
 
