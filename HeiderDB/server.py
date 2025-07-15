@@ -8,6 +8,32 @@ from HeiderDB.database.database import Database
 import nltk
 
 
+def convert_bytes_to_string(obj):
+    """
+    Convierte recursivamente objetos bytes a string para serialización JSON
+    """
+    if isinstance(obj, bytes):
+        return obj.decode('utf-8', errors='ignore').rstrip('\x00')
+    elif isinstance(obj, dict):
+        return {key: convert_bytes_to_string(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_bytes_to_string(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_bytes_to_string(item) for item in obj)
+    else:
+        return obj
+
+
+def json_serializer(obj):
+    """
+    Serializador JSON personalizado para manejar tipos no serializables
+    """
+    if isinstance(obj, bytes):
+        return obj.decode('utf-8', errors='ignore').rstrip('\x00')
+    # Para otros tipos no serializables, convertir a string
+    return str(obj)
+
+
 def run_server(host='0.0.0.0', port=54321):
     db = Database()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -22,7 +48,9 @@ def run_server(host='0.0.0.0', port=54321):
                     continue
                 try:
                     result = db.execute_query(data)
-                    response = json.dumps({"status": "ok", "result": result})
+                    # Convertir bytes a string antes de serializar
+                    clean_result = convert_bytes_to_string(result)
+                    response = json.dumps({"status": "ok", "result": clean_result}, default=json_serializer)
                 except Exception as e:
                     response = json.dumps({"status": "error", "message": str(e)})
                 conn.sendall(response.encode())
