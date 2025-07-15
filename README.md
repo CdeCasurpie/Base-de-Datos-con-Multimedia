@@ -20,9 +20,10 @@
 </div>
 
 
+### Diagrama de Arquitectura
+![Diagrama de Arquitectura](diagrama.jpeg)
 
-<div style="color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem; font-size: 1.5em; font-weight: bold;">Instalación</div>
-
+## Instalación
 ### Opción 1: Docker (Recomendado)
 
 #### 1. Clonar el repositorio
