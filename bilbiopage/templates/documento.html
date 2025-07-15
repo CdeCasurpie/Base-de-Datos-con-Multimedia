@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ doc.titulo }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="documento-section">
+        <h2>{{ doc.titulo }}</h2>
+        <pre>{{ doc.contenido }}</pre>
+        <a href="{{ url_for('index') }}">Volver a la búsqueda</a>
+    </div>
+</body>
+</html> 
