@@ -47,6 +47,7 @@ class ImageExtractor(FeatureExtractor):
             raise ValueError("Método no soportado. Elija 'sift' o 'cnn'.")
 
         self.method = method
+        self.media_type = "image"  # Agregar atributo media_type
         self.cnn_model = None
         self.sift_detector = None
 
@@ -161,9 +162,11 @@ class AudioExtractor(FeatureExtractor):
     Implementa métodos MFCC para caracterización con una dimensión fija de 20.
     """
 
-    def __init__(self):
+    def __init__(self, method="mfcc"):
         super().__init__()
         self._dimension = 20
+        self.media_type = "audio"  # Agregar atributo media_type
+        self.method = method  # Agregar atributo method
 
     def extract(self, file_path):
         return self._extract_mfcc(file_path)
@@ -205,7 +208,7 @@ def create_feature_extractor(media_type, method="sift"):
 
     Args:
         media_type (str): Type of media ("image" or "audio")
-        method (str): Method for image extraction ("sift" or "cnn")
+        method (str): Method for extraction ("sift"/"cnn" for images, "mfcc" for audio)
 
     Returns:
         FeatureExtractor: Appropriate feature extractor instance
@@ -213,7 +216,9 @@ def create_feature_extractor(media_type, method="sift"):
     if media_type == "image":
         return ImageExtractor(method=method)
     elif media_type == "audio":
-        return AudioExtractor()
+        # Para audio, usar method si se especifica, sino usar "mfcc" por defecto
+        audio_method = method if method in ["mfcc"] else "mfcc"
+        return AudioExtractor(method=audio_method)
     else:
         raise ValueError(f"Unsupported media type: {media_type}")
 
