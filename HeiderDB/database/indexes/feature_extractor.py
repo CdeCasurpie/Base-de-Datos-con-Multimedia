@@ -170,62 +170,198 @@ class ImageExtractor(FeatureExtractor):
 
 class AudioExtractor(FeatureExtractor):
     """
-    Extractor de características para audio.
-    Implementa métodos MFCC para extraer vectores locales por ventanas temporales.
+    Extractor de características para audio optimizado.
+    Extrae exactamente 40 vectores por archivo de audio usando ventanas fijas.
     """
 
-    def __init__(self, method="mfcc"):
+    def __init__(self, method="mfcc", vectors_per_file=40, target_dimension=20):
         super().__init__()
-        self._dimension = 128  # Dimensión de cada vector MFCC local
+        self._dimension = target_dimension  # 20 dimensiones por defecto
         self.media_type = "audio"
         self.method = method
+        self.vectors_per_file = vectors_per_file  # 40 vectores por archivo
+        
+        print(f"🎵 AudioExtractor inicializado:")
+        print(f"   - Método: {method}")
+        print(f"   - Vectores por archivo: {vectors_per_file}")
+        print(f"   - Dimensiones por vector: {target_dimension}")
 
     def extract(self, file_path):
+        """Extrae exactamente vectors_per_file vectores del archivo de audio"""
         if self.method == "mfcc":
-            return self._extract_mfcc_local(file_path)
+            return self._extract_mfcc_segments(file_path)
+        elif self.method == "spectral":
+            return self._extract_spectral_segments(file_path)
         else:
-            return self._extract_spectral_local(file_path)
+            return self._extract_mfcc_segments(file_path)  # Default a MFCC
 
     def get_vector_dimension(self):
         return self._dimension
 
-    def _extract_mfcc_local(self, audio_path):
+    def _extract_mfcc_segments(self, audio_path):
         """
-        Extrae características MFCC locales por ventanas temporales.
-        REtorna: list[numpy.ndarray] de vectores MFCC locales 
+        Extrae MFCCs dividiendo el audio en segmentos fijos.
+        Garantiza exactamente vectors_per_file vectores por archivo.
         """
         try:
             import librosa
             import numpy as np
 
+            # Cargar audio
             y, sr = librosa.load(audio_path, sr=None)
             
-            # Extraer MFCCs con más frames para tener más vectores locales
-            mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=self._dimension, 
-                                       hop_length=512, n_fft=2048)
-
-            if mfccs.size > 0:
-                # Transponer para tener (time_frames, n_mfcc)
-                mfcc_frames = mfccs.T
+            if len(y) == 0:
+                print(f"⚠️ Archivo de audio vacío: {audio_path}")
+                return self._generate_dummy_vectors()
+            
+            # Dividir audio en segmentos iguales
+            segment_length = len(y) // self.vectors_per_file
+            
+            if segment_length < 512:  # Segmento muy pequeño
+                print(f"⚠️ Audio muy corto ({len(y)/sr:.1f}s): {audio_path}")
+                return self._extract_with_overlap(y, sr)
+            
+            vectors = []
+            
+            for i in range(self.vectors_per_file):
+                start_idx = i * segment_length
+                end_idx = start_idx + segment_length
                 
-                # Retornar lista de vectores MFCC locales (uno por frame temporal)
-                return [frame.astype(np.float32) for frame in mfcc_frames]
-            else:
-                return [np.array([0.0] * self._dimension, dtype=np.float32)]
+                # Para el último segmento, tomar todo lo que queda
+                if i == self.vectors_per_file - 1:
+                    end_idx = len(y)
+                
+                segment = y[start_idx:end_idx]
+                
+                if len(segment) > 0:
+                    vector = self._extract_mfcc_from_segment(segment, sr)
+                    vectors.append(vector)
+                else:
+                    # Segmento vacío, usar vector dummy
+                    vectors.append(np.zeros(self._dimension, dtype=np.float32))
+            
+            print(f"✅ Extraídos {len(vectors)} vectores de {audio_path}")
+            return vectors
 
         except ImportError:
-            print("Warning: librosa not available, using dummy MFCC")
-            import numpy as np
-            return [np.array([0.1] * self._dimension, dtype=np.float32) for _ in range(10)]
-
+            print("⚠️ librosa no disponible, usando vectores dummy")
+            return self._generate_dummy_vectors()
+        
         except Exception as e:
-            print(f"Error procesando el archivo de audio {audio_path}: {e}")
-            import numpy as np
-            return [np.array([0.0] * self._dimension, dtype=np.float32)]
+            print(f"❌ Error procesando {audio_path}: {e}")
+            return self._generate_dummy_vectors()
 
-    def _extract_spectral_local(self, audio_path):
+    def _extract_mfcc_from_segment(self, segment, sr):
         """
-        Extrae características espectrales locales por ventanas temporales.
+        Extrae un vector MFCC promedio de un segmento de audio.
+        """
+        import librosa
+        import numpy as np
+        
+        # Extraer MFCCs del segmento
+        n_mfcc = min(13, self._dimension)  # Máximo 13 MFCCs estándar
+        
+        mfccs = librosa.feature.mfcc(
+            y=segment, 
+            sr=sr, 
+            n_mfcc=n_mfcc,
+            hop_length=512,
+            n_fft=min(2048, len(segment) // 2)
+        )
+        
+        if mfccs.size == 0:
+            return np.zeros(self._dimension, dtype=np.float32)
+        
+        # Promediar MFCCs sobre el tiempo
+        mfcc_mean = np.mean(mfccs, axis=1)
+        
+        # Si necesitamos más dimensiones, añadir características espectrales
+        if self._dimension > 13:
+            extra_features = self._extract_extra_features(segment, sr)
+            # Combinar hasta alcanzar _dimension
+            combined = np.concatenate([mfcc_mean, extra_features])
+            vector = combined[:self._dimension]  # Truncar si es necesario
+        else:
+            vector = mfcc_mean[:self._dimension]
+        
+        # Rellenar con ceros si es muy corto
+        if len(vector) < self._dimension:
+            padding = np.zeros(self._dimension - len(vector))
+            vector = np.concatenate([vector, padding])
+        
+        return vector.astype(np.float32)
+
+    def _extract_extra_features(self, segment, sr):
+        """
+        Extrae características espectrales adicionales del segmento.
+        """
+        import librosa
+        import numpy as np
+        
+        try:
+            # Características espectrales básicas
+            spectral_centroid = np.mean(librosa.feature.spectral_centroid(y=segment, sr=sr))
+            spectral_bandwidth = np.mean(librosa.feature.spectral_bandwidth(y=segment, sr=sr))
+            spectral_rolloff = np.mean(librosa.feature.spectral_rolloff(y=segment, sr=sr))
+            zcr = np.mean(librosa.feature.zero_crossing_rate(segment))
+            
+            # Características de energía
+            rms_energy = np.mean(librosa.feature.rms(y=segment))
+            
+            # Características tonales (solo primeras 2 para no sobrecargar)
+            chroma = librosa.feature.chroma_stft(y=segment, sr=sr)
+            chroma_mean = np.mean(chroma, axis=1)[:2]  # Solo 2 primeras componentes
+            
+            # Combinar características extra (7 dimensiones)
+            extra_features = np.array([
+                spectral_centroid,
+                spectral_bandwidth, 
+                spectral_rolloff,
+                zcr,
+                rms_energy,
+                chroma_mean[0] if len(chroma_mean) > 0 else 0.0,
+                chroma_mean[1] if len(chroma_mean) > 1 else 0.0
+            ])
+            
+            return extra_features
+            
+        except Exception as e:
+            print(f"⚠️ Error extrayendo características extra: {e}")
+            return np.zeros(7)  # 7 características extra
+
+    def _extract_with_overlap(self, y, sr):
+        """
+        Para audios muy cortos, extrae con ventanas superpuestas.
+        """
+        import librosa
+        import numpy as np
+        
+        vectors = []
+        window_size = len(y) // 4  # Ventanas más pequeñas
+        hop_size = window_size // 2  # 50% overlap
+        
+        for i in range(0, len(y) - window_size, hop_size):
+            if len(vectors) >= self.vectors_per_file:
+                break
+                
+            segment = y[i:i + window_size]
+            vector = self._extract_mfcc_from_segment(segment, sr)
+            vectors.append(vector)
+        
+        # Rellenar hasta vectors_per_file si es necesario
+        while len(vectors) < self.vectors_per_file:
+            if len(vectors) > 0:
+                # Duplicar el último vector válido
+                vectors.append(vectors[-1].copy())
+            else:
+                # Vector dummy
+                vectors.append(np.zeros(self._dimension, dtype=np.float32))
+        
+        return vectors[:self.vectors_per_file]  # Asegurar exactamente vectors_per_file
+
+    def _extract_spectral_segments(self, audio_path):
+        """
+        Extrae características espectrales por segmentos.
         """
         try:
             import librosa
@@ -233,39 +369,93 @@ class AudioExtractor(FeatureExtractor):
 
             y, sr = librosa.load(audio_path, sr=None)
             
-            # Extraer diferentes características espectrales
-            hop_length = 512
+            if len(y) == 0:
+                return self._generate_dummy_vectors()
             
-            # Spectral centroid, bandwidth, rolloff
-            spectral_centroids = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop_length)[0]
-            spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr, hop_length=hop_length)[0]
-            spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=hop_length)[0]
+            # Dividir en segmentos
+            segment_length = len(y) // self.vectors_per_file
+            vectors = []
             
-            # Zero crossing rate
-            zcr = librosa.feature.zero_crossing_rate(y, hop_length=hop_length)[0]
-            
-            # Combinar características para cada frame
-            features_per_frame = []
-            min_length = min(len(spectral_centroids), len(spectral_bandwidth), 
-                           len(spectral_rolloff), len(zcr))
-            
-            for i in range(min_length):
-                # Crear vector de características espectrales (extender a 20 dimensiones)
-                frame_features = np.array([
-                    spectral_centroids[i], spectral_bandwidth[i], spectral_rolloff[i], zcr[i]
-                ])
+            for i in range(self.vectors_per_file):
+                start_idx = i * segment_length
+                end_idx = start_idx + segment_length
                 
-                # Extender a 20 dimensiones con repetición controlada
-                extended_features = np.tile(frame_features, 5)[:self._dimension]
-                features_per_frame.append(extended_features.astype(np.float32))
+                if i == self.vectors_per_file - 1:
+                    end_idx = len(y)
+                
+                segment = y[start_idx:end_idx]
+                
+                if len(segment) > 0:
+                    vector = self._extract_spectral_from_segment(segment, sr)
+                    vectors.append(vector)
+                else:
+                    vectors.append(np.zeros(self._dimension, dtype=np.float32))
             
-            return features_per_frame if features_per_frame else [np.array([0.0] * self._dimension, dtype=np.float32)]
+            return vectors
 
         except Exception as e:
-            print(f"Error en extracción espectral de {audio_path}: {e}")
-            import numpy as np
-            return [np.array([0.0] * self._dimension, dtype=np.float32)]
+            print(f"❌ Error en extracción espectral: {e}")
+            return self._generate_dummy_vectors()
 
+    def _extract_spectral_from_segment(self, segment, sr):
+        """
+        Extrae vector de características espectrales de un segmento.
+        """
+        import librosa
+        import numpy as np
+        
+        try:
+            # Características espectrales básicas
+            spectral_features = []
+            
+            spectral_features.append(np.mean(librosa.feature.spectral_centroid(y=segment, sr=sr)))
+            spectral_features.append(np.mean(librosa.feature.spectral_bandwidth(y=segment, sr=sr)))
+            spectral_features.append(np.mean(librosa.feature.spectral_rolloff(y=segment, sr=sr)))
+            spectral_features.append(np.mean(librosa.feature.zero_crossing_rate(segment)))
+            spectral_features.append(np.mean(librosa.feature.rms(y=segment)))
+            
+            # Extender el vector replicando características hasta _dimension
+            base_features = np.array(spectral_features)
+            extended_vector = np.tile(base_features, (self._dimension // len(base_features)) + 1)
+            
+            return extended_vector[:self._dimension].astype(np.float32)
+            
+        except Exception as e:
+            print(f"⚠️ Error en características espectrales: {e}")
+            return np.zeros(self._dimension, dtype=np.float32)
+
+    def _generate_dummy_vectors(self):
+        """
+        Genera vectors_per_file vectores dummy cuando hay errores.
+        """
+        import numpy as np
+        
+        return [
+            np.random.normal(0, 0.1, self._dimension).astype(np.float32) 
+            for _ in range(self.vectors_per_file)
+        ]
+
+    def get_extraction_stats(self, file_path):
+        """
+        Obtiene estadísticas de extracción para un archivo (útil para debugging).
+        """
+        try:
+            import librosa
+            
+            y, sr = librosa.load(file_path, sr=None)
+            duration = len(y) / sr
+            segment_duration = duration / self.vectors_per_file
+            
+            return {
+                "duration_seconds": duration,
+                "sample_rate": sr,
+                "total_samples": len(y),
+                "vectors_extracted": self.vectors_per_file,
+                "segment_duration": segment_duration,
+                "samples_per_segment": len(y) // self.vectors_per_file
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
 def create_feature_extractor(media_type, method="sift"):
     """
