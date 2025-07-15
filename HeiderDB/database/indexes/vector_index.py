@@ -26,16 +26,24 @@ class VectorIndex:
       Formato: [HEADER: 8 bytes size][PAGE_0: doc_ids][HEADER: 8 bytes][PAGE_1: doc_ids]...
     """
     
-    def __init__(self, index_file, metadata_file, page_size=100, cache_size=10, num_clusters=500):
+    def __init__(self, index_file, metadata_file, page_size=100, cache_size=10, num_clusters=500, table_name=None):
         self.index_file = index_file
         self.metadata_file = metadata_file
         self.page_size = page_size  
         self.cache_size = cache_size
         self.num_clusters = num_clusters
         
-        # Archivos de datos
+        # Extraer nombre de tabla para evitar colisiones
+        if table_name:
+            self.table_name = table_name
+        else:
+            # Extraer del nombre del archivo si no se proporciona
+            base_name = os.path.basename(index_file)
+            self.table_name = base_name.replace('.pkl', '').replace('_index', '')
+        
+        # Archivos de datos con nombres únicos por tabla
         self.tfidf_vectors_file = self.index_file.replace('.pkl', '_tfidf_vectors.dat')
-        self.clusters_dir = os.path.join(os.path.dirname(self.index_file), 'clusters')
+        self.clusters_dir = os.path.join(os.path.dirname(self.index_file), f'clusters_{self.table_name}')
         os.makedirs(self.clusters_dir, exist_ok=True)
         
         # Estructura 1: ID → vector TF-IDF (paginado horizontal tradicional)
@@ -643,6 +651,9 @@ class VectorIndex:
         try:
             os.makedirs(os.path.dirname(self.metadata_file), exist_ok=True)
             metadata = {
+                # Identificador de tabla para evitar colisiones
+                'table_name': self.table_name,
+                
                 # Estructura 3: IDF en RAM
                 'cluster_idf': {str(k): float(v) for k, v in self.cluster_idf.items()},
                 'cluster_document_count': {str(k): int(v) for k, v in self.cluster_document_count.items()},
@@ -678,6 +689,14 @@ class VectorIndex:
             if os.path.exists(self.metadata_file):
                 with open(self.metadata_file, 'r') as f:
                     metadata = json.load(f)
+                
+                # Cargar table_name si existe
+                loaded_table_name = metadata.get('table_name')
+                if loaded_table_name and not hasattr(self, 'table_name'):
+                    self.table_name = loaded_table_name
+                    # Actualizar clusters_dir con el nombre correcto
+                    self.clusters_dir = os.path.join(os.path.dirname(self.index_file), f'clusters_{self.table_name}')
+                    os.makedirs(self.clusters_dir, exist_ok=True)
                 
                 # Cargar Estructura 3: IDF
                 self.cluster_idf = {int(k): float(v) for k, v in metadata.get('cluster_idf', {}).items()}

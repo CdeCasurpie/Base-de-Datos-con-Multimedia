@@ -3,6 +3,7 @@
 Script para insertar datos multimedia automáticamente.
 Crea tablas de imágenes y audios e inserta todos los archivos de las carpetas correspondientes.
 Usa images_dataset como dataset de entrenamiento para el vocabulario visual.
+Usa test_audios como dataset de entrenamiento para el vocabulario auditivo.
 """
 
 import os
@@ -60,7 +61,10 @@ def create_and_populate_tables():
     # Directorios de archivos multimedia
     images_dir = "./HeiderDB/test_images"
     audios_dir = "./HeiderDB/test_audios"
-    training_dataset_dir = "/home/cesar/Escritorio/Proyectos/Base-de-Datos-con-Multimedia/HeiderDB/images_dataset"
+    
+    # Datasets de entrenamiento
+    training_images_dataset = "/home/cesar/Escritorio/Proyectos/Base-de-Datos-con-Multimedia/HeiderDB/images_dataset"
+    training_audios_dataset = "/home/cesar/Escritorio/Proyectos/Base-de-Datos-con-Multimedia/HeiderDB/test_audios"
     
     # Extensiones permitidas
     image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']
@@ -83,9 +87,9 @@ def create_and_populate_tables():
     ) using index bplus_tree(id);
     """
 
-    # Crear índice multimedia CON entrenamiento automático
-    create_index = f"""
-    CREATE MULTIMEDIA INDEX idx_image ON imagenes (archivo) WITH TYPE image METHOD sift TRAIN FROM '/home/cesar/Escritorio/Proyectos/Base-de-Datos-con-Multimedia/HeiderDB/images_dataset';
+    # Crear índice multimedia CON entrenamiento automático para imágenes
+    create_images_index = f"""
+    CREATE MULTIMEDIA INDEX idx_image ON imagenes (archivo) WITH TYPE image METHOD sift TRAIN FROM '{training_images_dataset}';
     """
     
     try:
@@ -95,12 +99,12 @@ def create_and_populate_tables():
         else:
             print(f"⚠️  Tabla 'imagenes': {response.get('message', 'Ya existe o error')}")
             
-        print(f"🧠 Entrenando vocabulario visual desde: {training_dataset_dir}")
-        response2 = client.send_query(create_index)
+        print(f"🧠 Entrenando vocabulario visual desde: {training_images_dataset}")
+        response2 = client.send_query(create_images_index)
         if response2['status'] == 'ok':
-            print("✅ Índice multimedia creado y vocabulario visual entrenado exitosamente")
+            print("✅ Índice multimedia de imágenes creado y vocabulario visual entrenado exitosamente")
         else:
-            print(f"❌ Error creando índice multimedia no uwu: {response2.get('message', 'Error desconocido')}")
+            print(f"❌ Error creando índice multimedia de imágenes: {response2.get('message', 'Error desconocido')}")
     except Exception as e:
         print(f"❌ Error creando tabla/índice 'imagenes': {e}")
     
@@ -126,9 +130,9 @@ def create_and_populate_tables():
             print(f"  ❌ [{i:2d}] Excepción insertando {nombre}: {e}")
     
     # ================================
-    # TABLA DE AUDIOS (sin entrenamiento específico)
+    # TABLA DE AUDIOS CON ENTRENAMIENTO
     # ================================
-    print(f"\n🎵 Procesando tabla de audios...")
+    print(f"\n🎵 Procesando tabla de audios con entrenamiento...")
     
     # Crear tabla de audios (si no existe)
     create_audios_query = """
@@ -139,19 +143,26 @@ def create_and_populate_tables():
     ) using index bplus_tree(id);
     """
 
-    create_index = """
-    CREATE MULTIMEDIA INDEX idx_audio ON audios (archivo) WITH TYPE audio METHOD mfcc;
+    # Crear índice multimedia CON entrenamiento automático para audios
+    create_audios_index = f"""
+    CREATE MULTIMEDIA INDEX idx_audio ON audios (archivo) WITH TYPE audio METHOD mfcc TRAIN FROM '{training_audios_dataset}';
     """
     
     try:
         response = client.send_query(create_audios_query)
-        response2 = client.send_query(create_index)
         if response['status'] == 'ok':
             print("✅ Tabla 'audios' creada exitosamente")
         else:
             print(f"⚠️  Tabla 'audios': {response.get('message', 'Ya existe o error')}")
+            
+        print(f"🧠 Entrenando vocabulario auditivo desde: {training_audios_dataset}")
+        response2 = client.send_query(create_audios_index)
+        if response2['status'] == 'ok':
+            print("✅ Índice multimedia de audios creado y vocabulario auditivo entrenado exitosamente")
+        else:
+            print(f"❌ Error creando índice multimedia de audios: {response2.get('message', 'Error desconocido')}")
     except Exception as e:
-        print(f"❌ Error creando tabla 'audios': {e}")
+        print(f"❌ Error creando tabla/índice 'audios': {e}")
     
     # Obtener archivos de audio
     audio_files = get_files_from_directory(audios_dir, audio_extensions)
@@ -202,14 +213,16 @@ def create_and_populate_tables():
     print(f"\n🎉 ¡Proceso completado!")
     print("=" * 70)
     print("💡 Características del sistema:")
-    print(f"   🧠 Vocabulario visual entrenado desde: {training_dataset_dir}")
+    print(f"   🧠 Vocabulario visual entrenado desde: {training_images_dataset}")
+    print(f"   🎧 Vocabulario auditivo entrenado desde: {training_audios_dataset}")
     print("   📸 Índice de imágenes: SIFT con TF-IDF y paginación eficiente")
-    print("   🎵 Índice de audios: MFCC con vectores locales")
+    print("   🎵 Índice de audios: MFCC con TF-IDF y clustering auditivo")
     print("\n💡 Puedes verificar las tablas con:")
     print("   python HeiderDB/client.py --query \"SELECT * FROM imagenes;\"")
     print("   python HeiderDB/client.py --query \"SELECT * FROM audios;\"")
     print("\n💡 Búsquedas por similitud:")
     print("   python HeiderDB/client.py --query \"SELECT * FROM imagenes WHERE archivo SIMILAR TO '/path/to/query.jpg' LIMIT 5;\"")
+    print("   python HeiderDB/client.py --query \"SELECT * FROM audios WHERE archivo SIMILAR TO '/path/to/query.mp3' LIMIT 5;\"")
 
 
 if __name__ == "__main__":

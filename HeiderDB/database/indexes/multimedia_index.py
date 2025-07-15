@@ -32,6 +32,7 @@ class MultimediaIndex(IndexBase):
             index_file=vector_index_file,
             metadata_file=vector_metadata_file,
             page_size=self.page_size,
+            table_name=f"{self.table_name}_{self.column_name}",  # Añadir table_name único
         )
         if os.path.exists(self.metadata_file):
             self._load_metadata()
