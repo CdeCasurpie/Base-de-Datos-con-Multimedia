@@ -116,16 +116,6 @@ class MultimediaIndex(IndexBase):
             if qvec is None:
                 return []
 
-            # Verificar que hay vectores en el índice
-            vector_count = (
-                len(self.vector_index.vector_index)
-                if hasattr(self.vector_index, "vector_index")
-                else 0
-            )
-
-            if vector_count == 0:
-                return []
-
             # Ejecutar búsqueda KNN
             results = self.vector_index.search_knn(qvec, k)
             return results

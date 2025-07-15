@@ -206,6 +206,17 @@ class Table:
         """
         Save the table metadata to a JSON file.
         """
+        # Recopilar información de índices multimedia
+        multimedia_indexes = {}
+        for column_name, index_obj in self.indexes.items():
+            if hasattr(index_obj, 'feature_extractor') and index_obj.feature_extractor:
+                media_type = getattr(index_obj.feature_extractor, 'media_type', 'image')
+                method = getattr(index_obj.feature_extractor, 'method', 'sift')
+                multimedia_indexes[column_name] = {
+                    'media_type': media_type,
+                    'method': method
+                }
+        
         metadata = {
             "name": self.name,
             "columns": self.columns,
@@ -215,6 +226,7 @@ class Table:
             "pack_string": self.pack_string,
             "spatial_columns": self.spatial_columns,
             "text_columns": self.text_columns,
+            "multimedia_indexes": multimedia_indexes,
         }
         with open(self.metadata_path, "w") as f:
             json.dump(metadata, f, indent=4)
@@ -319,6 +331,13 @@ class Table:
                 except Exception as e:
                     print(f"Error adding text index for {column}: {e}")
 
+        for column, multimedia_index in self.indexes.items():
+            if column in record:
+                try:
+                    multimedia_index.add(record, primary_key_value)
+                except Exception as e:
+                    print(f"Error adding multimedia index for {column}: {e}")
+
         # Update record count
         self.record_count += 1
 
@@ -362,6 +381,12 @@ class Table:
                 text_index.remove(value)
             except Exception as e:
                 print(f"Warning: Error removing from text index: {e}")
+
+        for multimedia_index in self.indexes.values():
+            try:
+                multimedia_index.remove(value)
+            except Exception as e:
+                print(f"Warning: Error removing from multimedia index: {e}")
 
         # Remove the record from the primary index
         try:
@@ -658,18 +683,58 @@ class Table:
         print(f"Índice invertido creado para la tabla: {self.name}")
 
     def _create_multimedia_indexes(self):
+        # Cargar información de multimedia indexes desde metadata
+        multimedia_indexes_metadata = getattr(self, 'metadata', {}).get('multimedia_indexes', {})
+        
+        # Si hay metadata de multimedia indexes, recrearlos
+        for column_name, index_info in multimedia_indexes_metadata.items():
+            if column_name in self.columns:
+                col_type = self.columns[column_name]
+                if col_type in ["IMAGE", "AUDIO", "VIDEO"]:
+                    media_type = index_info.get('media_type', 'image')
+                    method = index_info.get('method', 'sift')
+                    
+                    # Determinar media_type basado en el tipo de columna si no está especificado
+                    if media_type == 'image' and col_type == 'IMAGE':
+                        media_type = 'image'
+                    elif col_type == 'AUDIO':
+                        media_type = 'audio'
+                    elif col_type == 'VIDEO':
+                        media_type = 'video'
+                    
+                    self.indexes[column_name] = MultimediaIndex(
+                        self.name,
+                        column_name,
+                        self.data_path,
+                        self,
+                        self.page_size,
+                    )
+                    self.indexes[column_name].initialize(media_type, method)
+                    print(f"Multimedia index recreated for column: {column_name} (type: {media_type}, method: {method})")
+        
+        # Mantener compatibilidad con el código antiguo
         multimedia_columns = getattr(self, "multimedia_columns", [])
         for column in multimedia_columns:
-            if column in self.columns:
-                self.indexes[column] = MultimediaIndex(
-                    self.name,
-                    column,
-                    self.data_path,
-                    self,
-                    self.page_size,
-                )
-                self.indexes[column].initialize("image")
-                print(f"Multimedia index created for column: {column}")
+            if column in self.columns and column not in self.indexes:
+                col_type = self.columns[column]
+                if col_type in ["IMAGE", "AUDIO", "VIDEO"]:
+                    # Determinar media_type y method por defecto basado en el tipo de columna
+                    if col_type == "IMAGE":
+                        media_type, method = "image", "sift"
+                    elif col_type == "AUDIO":
+                        media_type, method = "audio", "mfcc"
+                    elif col_type == "VIDEO":
+                        media_type, method = "video", "sift"  # Por defecto para video
+                    
+                    self.indexes[column] = MultimediaIndex(
+                        self.name,
+                        column,
+                        self.data_path,
+                        self,
+                        self.page_size,
+                    )
+                    self.indexes[column].initialize(media_type, method)
+                    print(f"Multimedia index created for column: {column} (type: {media_type}, method: {method})")
 
     def add(self, record):
         # Validate record structure
@@ -820,7 +885,10 @@ class Table:
                 self,
                 self.page_size,
             )
-            idx.initialize(opts.get("media_type", "image"))
+            # Pasar tanto media_type como method al inicializar
+            media_type = opts.get("media_type", "image")
+            method = opts.get("method", "sift")
+            idx.initialize(media_type, method)
             self.indexes[column_name] = idx
             return idx
         else:
