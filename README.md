@@ -268,3 +268,9 @@ SELECT * FROM documentos WHERE abstract CONTAINS 'neural networks deep learning'
 | 20000   | 1516.76      | 43.307          |
 
 ![Grafica comparativo](grafica1.png)
+
+## FRONTEND
+![Grafica comparativo](FRONTEND1.jpg)
+![Grafica comparativo](FRONTEND2.jpg)
+![Grafica comparativo](FRONTEND3.jpg)
+![Grafica comparativo](FRONTEND4.jpg)
