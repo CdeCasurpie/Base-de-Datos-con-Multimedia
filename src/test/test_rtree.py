@@ -447,8 +447,6 @@ def main():
     # Crear tabla con datos espaciales
     table = create_spatial_table()
 
-    # Insertar datos de muestra
-    insert_sample_data(table, 100)
 
     while True:
         print("\n" + "=" * 50)
@@ -488,7 +486,10 @@ def main():
             try:
                 num = int(input("¿Cuántos registros adicionales? "))
                 current_count = table.get_record_count()
+                # cronometro
+                start_time = time.time()
                 insert_sample_data(table, num)
+                end_time = time.time()
                 print(f"✓ Datos insertados. Total: {table.get_record_count()}")
             except ValueError:
                 print("Error: Ingresa un número válido")
