@@ -220,3 +220,16 @@ SELECT * FROM documentos WHERE abstract CONTAINS 'neural networks deep learning'
 - Cada tabla puede tener múltiples índices secundarios
 - El sistema soporta transacciones básicas y recuperación de errores
 - La implementación incluye optimizaciones de memoria secundaria y algoritmos de paginación
+
+## Experimentación y Evaluación de Desempeño
+| N       | MyIndex (ms) | PostgreSQL (ms) |
+|---------|--------------|-----------------|
+| 100     | 18.64        | 0.550           |
+| 200     | 26.18        | 0.335           |
+| 400     | 59.97        | 1.399           |
+| 800     | 115.63       | 2.313           |
+| 1600    | 139.56       | 6.573           |
+| 3200    | 225.69       | 7.715           |
+| 6400    | 462.24       | 15.009          |
+| 12800   | 947.61       | 16.439          |
+| 20000   | 1516.76      | 43.307          |
