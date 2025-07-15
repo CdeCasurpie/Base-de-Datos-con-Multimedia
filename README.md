@@ -121,7 +121,7 @@ Para esta implementación se desarrollaron dos nuevos tipos de índices junto co
 
 ### `InvertedIndex`
 Gestiona un índice invertido tradicional para realizar búsquedas eficientes por palabras clave.  
-Es ideal para estructuras textuales o contenidos que requieren recuperación basada en términos.
+Es recomendable para estructuras textuales o contenidos que requieren recuperación basada en términos.
 
 ---
 
@@ -136,7 +136,7 @@ Implementaciones concretas:
 - `AudioExtractor`: procesa archivos de audio y extrae características relevantes.
 
 ##### `VectorIndex`
-Encargado de almacenar los vectores generados por el `FeatureExtractor`, y de ejecutar operaciones de comparación y **búsqueda por similitud** entre vectores.
+Almacena y organiza los vectores de características para permitir búsquedas por similitud.
 
 ---
 
