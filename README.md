@@ -14,7 +14,7 @@
 <div style="padding: 0.5rem; background: #f8f9fa; border-radius: 3px; color: black">• Cesar Perales</div>
 <div style="padding: 0.5rem; background: #f8f9fa; border-radius: 3px; color: black">• Fernando Usurin</div>
 <div style="padding: 0.5rem; background: #f8f9fa; border-radius: 3px; color: black">• Fabryzzio Meza</div>
-<div style="padding: 0.5rem; background: #f8f9fa; border-radius: 3px; color: black">• Yoselyn Torres</div>
+<div style="padding: 0.5rem; background: #f8f9fa; border-radius: 3px; color: black">• Yoselyn Miranda</div>
 <div style="padding: 0.5rem; background: #f8f9fa; border-radius: 3px; color: black">• Flavio Tipula</div>
 </div>
 </div>
