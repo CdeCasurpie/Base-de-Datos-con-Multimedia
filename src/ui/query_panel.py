@@ -19,7 +19,7 @@ class QueryPanel(QWidget):
         self.query_type_combo.addItems([
             "SQL Personalizado", "SELECT", "INSERT",
             "CREATE TABLE", "CREATE TABLE FROM FILE",
-            "CREATE SPATIAL INDEX", "DELETE"
+            "CREATE SPATIAL INDEX", "DELETE", "DROP TABLE"
         ])
         options_layout.addWidget(self.query_type_label)
         options_layout.addWidget(self.query_type_combo)
@@ -83,7 +83,8 @@ class QueryPanel(QWidget):
                 'USING INDEX tipo("columna1");'
             ),
             "CREATE SPATIAL INDEX": 'CREATE SPATIAL INDEX idx_nombre ON nombre_tabla (columna_spatial);',
-            "DELETE": 'DELETE FROM nombre_tabla WHERE columna1 = valor;'
+            "DELETE": 'DELETE FROM nombre_tabla WHERE columna1 = valor;',
+            "DROP TABLE": 'DROP TABLE nombre_tabla;'
         }
         dialog = QMessageBox()
         dialog.setWindowTitle("Plantillas de consultas")
@@ -125,7 +126,8 @@ class QueryPanel(QWidget):
                 'USING INDEX tipo("columna1");'
             ),  # CREATE TABLE FROM FILE
             5: 'CREATE SPATIAL INDEX idx_nombre ON nombre_tabla (columna_spatial);',  # CREATE SPATIAL INDEX
-            6: 'DELETE FROM nombre_tabla WHERE columna1 = valor;'  # DELETE
+            6: 'DELETE FROM nombre_tabla WHERE columna1 = valor;',  # DELETE
+            7: 'DROP TABLE nombre_tabla;'  # DROP TABLE
         }
         if index in templates:
             self.query_editor.setText(templates[index])

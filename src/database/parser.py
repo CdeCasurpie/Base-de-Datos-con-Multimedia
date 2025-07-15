@@ -16,6 +16,8 @@ def parse_query(query):
     
     CREATE_SPATIAL_INDEX ::= "CREATE SPATIAL INDEX" index_name "ON" table_name "(" column_name ")"
     
+    DROP_TABLE ::= "DROP TABLE" table_name
+    
     SELECT ::= "select" ("*" | column_list) "from" table_name [where_clause] [spatial_clause]
     column_list ::= column_name ("," column_name)*
     where_clause ::= "where" condition
@@ -39,7 +41,55 @@ def parse_query(query):
     
     query = query.strip()
     
+    index_map = {
+        'sequential': 'sequential',
+        'seq': 'sequential',
+        'sequential_index': 'sequential',
+        'sequential_indexed': 'sequential',
+        'sequential_indexed_table': 'sequential',
+        'seq_index': 'sequential',
+        'seq_idx': 'sequential',
+        'bplus_tree': 'bplus_tree',
+        'btree': 'bplus_tree',
+        'b_tree': 'bplus_tree',
+        'b_tree_index': 'bplus_tree',
+        'bplus_tree_index': 'bplus_tree',
+        'bplus': 'bplus_tree',
+        'b_plus': 'bplus_tree',
+        'extendible_hash': 'extendible_hash',
+        'ext_hash': 'extendible_hash',
+        'hash': 'extendible_hash',
+        'hash_index': 'extendible_hash',
+        'hash_table': 'extendible_hash',
+        'isam_sparse': 'isam_sparse',
+        'isam': 'isam_sparse',
+        'isam_index': 'isam_sparse',
+        'isam_sparse_index': 'isam_sparse',
+        'isam_table': 'isam_sparse',
+        'rtree': 'rtree',
+        'rtree_sparse': 'rtree_sparse',
+        'rtree_index': 'rtree',
+        'rtree_table': 'rtree',
+        'rtree_spatial': 'rtree',
+        'rtree_spatial_index': 'rtree',
+        'spatial': 'rtree'
+    }
+
     try:
+        # DROP TABLE
+        drop_table_pattern = r'''
+            DROP\s+TABLE\s+(\w+)
+            \s*;?$
+        '''
+        
+        match = re.match(drop_table_pattern, query, re.IGNORECASE | re.VERBOSE)
+        if match:
+            return {
+                'type': 'DROP_TABLE',
+                'table_name': match.group(1),
+                'error_message': None
+            }
+            
         # CREATE SPATIAL INDEX
         spatial_index_pattern = r'''
             CREATE\s+SPATIAL\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(\s*(\w+)\s*\)
@@ -131,17 +181,7 @@ def parse_query(query):
                         primary_key_found = col_name
                         if col_index_type:
                             table_index_type = col_index_type.lower()
-                            # Mapear nombres de índices a los tipos internos del sistema
-                            if table_index_type in ['seq', 'sequential', 'sequential_index']:
-                                table_index_type = 'sequential'
-                            elif table_index_type in ['btree', 'bplus', 'b_plus', 'b_tree', 'b_tree_index', 'bplus_tree']:
-                                table_index_type = 'bplus_tree'
-                            elif table_index_type in ['hash', 'extendible_hash', 'ext_hash', 'extendible', 'hash_index', 'hash_table']:
-                                table_index_type = 'extendible_hash'
-                            elif table_index_type in ['isam', 'isam_sparse', 'sparse', 'isam_index', 'isam_table', 'isam_sparse_index']:
-                                table_index_type = 'isam_sparse'
-                            elif table_index_type in ['rtree', 'r_tree', 'spatial', 'spatial_index', 'rtree_index', 'rtree_table', 'rtree_sparse']:
-                                table_index_type = 'rtree'
+                            table_index_type = index_map.get(table_index_type, 'sequential')
                     
                     # Si tiene SPATIAL INDEX o es un tipo espacial, agregarlo a spatial_columns
                     if is_spatial_index or data_type in ['POINT', 'POLYGON', 'LINESTRING', 'GEOMETRY']:
@@ -192,7 +232,7 @@ def parse_query(query):
                 'type': 'CREATE_TABLE_FROM_FILE',
                 'table_name': match.group(1),
                 'file_path': match.group(2),
-                'index_type': match.group(3).lower(),
+                'index_type': index_map.get(match.group(3).lower(), 'sequential'),
                 'primary_key': match.group(4),
                 'error_message': None
             }
