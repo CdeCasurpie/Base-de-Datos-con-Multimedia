@@ -14,7 +14,7 @@ class Database:
         
         self._load_tables()
     
-    def create_table(self, table_name, columns, primary_key=None, index_type="sequential", spatial_columns=None, page_size=4096):
+    def create_table(self, table_name, columns, primary_key=None, index_type="sequential", spatial_columns=None, page_size=4096, text_columns=None):
         """
         Crea una nueva tabla en la base de datos.
 
@@ -45,7 +45,8 @@ class Database:
                 primary_key=primary_key,
                 page_size=page_size,
                 index_type=index_type,
-                spatial_columns=spatial_columns
+                spatial_columns=spatial_columns,
+                text_columns=text_columns
             )
             
             self.tables[table_name] = table
@@ -382,7 +383,8 @@ class Database:
                     columns=parsed['columns'],
                     primary_key=parsed['primary_key'],
                     index_type=parsed['index_type'],
-                    spatial_columns=parsed.get('spatial_columns', [])
+                    spatial_columns=parsed.get('spatial_columns', []),
+                    text_columns=parsed.get('text_columns', [])
                 )
                 return message, not success 
             
@@ -422,28 +424,13 @@ class Database:
                 if not col_type.startswith("VARCHAR"):
                     return None, f"La columna '{column_name}' no es un tipo de texto válido (VARCHAR)"
                 
-                # Crear el índice invertido
-                try:
-                    from database.indexes.inverted_index import InvertedIndex
-                    
-                    table.text_indexes = getattr(table, 'text_indexes', {})
-                    table.text_indexes[column_name] = InvertedIndex(
-                        table_name=table_name,
-                        column_name=column_name,
-                        data_path=table.data_path,
-                        table_ref=table,
-                        page_size=table.page_size
-                    )
-                    
-                    # Indexar todos los registros existentes
-                    for record in table.get_all():
-                        primary_key_value = record.get(table.primary_key)
-                        if primary_key_value is not None:
-                            table.text_indexes[column_name].add(record, primary_key_value)
-                            
+                if column_name not in table.text_columns:
+                    table.text_columns.append(column_name)
+                    table._create_text_indexes()
+                    table._save_metadata()
                     return f"Índice invertido creado para '{column_name}'", None
-                except Exception as e:
-                    return None, f"Error al crear índice invertido: {str(e)}"
+                else:
+                    return None, f"Ya existe un índice invertido para '{column_name}'"
                 
             # CREATE SPATIAL INDEX
             elif query_type == 'CREATE_SPATIAL_INDEX':
@@ -486,6 +473,15 @@ class Database:
                     selected_columns = table.get_column_names()
                 else:
                     selected_columns = [col.strip() for col in parsed['columns'].split(',')]
+                    
+                # Manejo especial para SELECT TOP N
+                top_limit = None
+                if selected_columns and selected_columns[0].upper().startswith('TOP '):
+                    try:
+                        top_limit = int(selected_columns[0].split(' ')[1])
+                        selected_columns = table.get_column_names()  # Si es TOP N, seleccionamos todas las columnas
+                    except (IndexError, ValueError):
+                        return None, f"Error en cláusula TOP: formato incorrecto"
                 
                 # Verificar columnas
                 for col in selected_columns:
@@ -496,8 +492,45 @@ class Database:
                 if 'condition_type' in parsed:
                     condition = parsed['condition_type']
                     
+                    # Búsqueda textual - CONTAINS
+                    if condition == 'TEXT_CONTAINS':
+                        column = parsed['column']
+                        query_text = parsed['query']
+
+                        print(f"DEBUG: Ejecutando TEXT_CONTAINS en columna '{column}' con query '{query_text}'")
+                        
+                        # Verificar que existe el índice invertido
+                        if not hasattr(table, 'text_indexes') or column not in table.text_indexes:
+                            return None, f"No hay índice invertido en columna '{column}'. Utilice CREATE INVERTED INDEX."
+                        
+                        # Ejecutar búsqueda con el índice invertido
+                        try:
+                            results = table.text_indexes[column].search(query_text)
+                            if not results:
+                                return [], None  # No se encontraron resultados
+                        except Exception as e:
+                            return None, f"Error en búsqueda de texto: {str(e)}"
+                    
+                    # Búsqueda textual por relevancia - RANKED BY
+                    elif condition == 'TEXT_RANKED':
+                        column = parsed['column']
+                        query_text = parsed['query']
+                        limit = parsed.get('limit', 5)  # Límite por defecto: 5
+                        
+                        # Verificar que existe el índice invertido
+                        if not hasattr(table, 'text_indexes') or column not in table.text_indexes:
+                            return None, f"No hay índice invertido en columna '{column}'. Utilice CREATE INVERTED INDEX."
+                        
+                        # Ejecutar búsqueda por relevancia
+                        try:
+                            results = table.text_indexes[column].search_ranked(query_text, limit)
+                            if not results:
+                                return [], None  # No se encontraron resultados
+                        except Exception as e:
+                            return None, f"Error en búsqueda por relevancia: {str(e)}"
+                    
                     # Búsqueda espacial - dentro de radio
-                    if condition in ['SPATIAL_WITHIN', 'SPATIAL']:
+                    elif condition in ['SPATIAL_WITHIN', 'SPATIAL']:
                         column = parsed['column']
                         point = parsed['point']
                         radius = parsed['radius']
@@ -586,6 +619,12 @@ class Database:
                 else:
                     # Sin condiciones, recuperar todos los registros
                     results = table.get_all()
+                
+                # Aplicar límite TOP N si está especificado
+                if top_limit is not None and isinstance(results, list):
+                    results = results[:top_limit]
+
+                print(results)
                 
                 # Filtrar solo las columnas solicitadas
                 filtered_results = []
@@ -887,7 +926,8 @@ class Database:
             "primary_key": table.primary_key,
             "index_type": table.index_type,
             "record_count": table.get_record_count(),
-            "spatial_columns": table.spatial_columns
+            "spatial_columns": table.spatial_columns,
+            "text_columns": table.text_columns
         }
         
         # Información de índices espaciales

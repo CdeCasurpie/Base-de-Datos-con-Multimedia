@@ -173,18 +173,17 @@ class InvertedIndex(IndexBase):
             # Búsqueda booleana
             results = self.search_boolean(query)
             if results:
-                return results[0]  # Retornar solo el primer resultado
+                return results
         elif " " in query:
             # Búsqueda rankeada (multi-término)
-            results = self.search_ranked(query, k=1)
+            results = self.search_ranked(query, k=100)
             if results:
-                return results[0]
+                return results
         else:
             # Búsqueda simple de un término
             results = self.search_term(query)
             if results:
-                return results[0]
-                
+                return results
         return None
         
     def range_search(self, begin_key, end_key=None):
@@ -414,6 +413,8 @@ class InvertedIndex(IndexBase):
         """
         # Procesar el término
         processed_terms = self.text_processor.process_text(term)
+
+        print("Procesed terms:", processed_terms)  # Depuración     
         
         if not processed_terms:
             return []

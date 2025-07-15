@@ -1,8 +1,8 @@
 {
   "table_name": "documents",
   "column_name": "title",
-  "doc_count": 100,
-  "vocabulary_size": 24,
-  "created_at": 1751532968.6467485,
-  "updated_at": 1751532974.6870265
+  "doc_count": 50,
+  "vocabulary_size": 23,
+  "created_at": 1751584880.7227983,
+  "updated_at": 1751584880.8154097
 }

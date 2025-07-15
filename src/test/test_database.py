@@ -207,10 +207,13 @@ Para salir, escriba '{Colors.WHITE}exit{Colors.WHITE}' o '{Colors.WHITE}quit{Col
         
         if table_info.get('spatial_columns'):
             print(f"{Colors.GREEN}Columnas espaciales: {Colors.YELLOW}{', '.join(table_info['spatial_columns'])}{Colors.RESET}")
+            
+        if table_info.get('text_columns'):
+            print(f"{Colors.GREEN}Columnas textuales indexadas: {Colors.YELLOW}{', '.join(table_info['text_columns'])}{Colors.RESET}")
         
         print(f"\n{Colors.BOLD}Columnas:{Colors.RESET}")
         print(f"{Colors.CYAN}{'-' * 50}{Colors.RESET}")
-        header = f"{Colors.BOLD}{'Nombre':<20} | {'Tipo':<15} | {'Clave':<5} | {'Índice':<10}{Colors.RESET}"
+        header = f"{Colors.BOLD}{'Nombre':<20} | {'Tipo':<15} | {'Clave':<5} | {'Índice':<15}{Colors.RESET}"
         print(header)
         print(f"{Colors.CYAN}{'-' * 50}{Colors.RESET}")
         
@@ -218,13 +221,15 @@ Para salir, escriba '{Colors.WHITE}exit{Colors.WHITE}' o '{Colors.WHITE}quit{Col
             is_pk = f"{Colors.YELLOW}PK{Colors.RESET}" if col_name == table_info['primary_key'] else ""
             index_type = table_info['index_type'] if col_name == table_info['primary_key'] else ""
             
-            # Añadir indicador espacial con color
+            # Añadir indicadores de índices con colores
             if col_name in table_info.get('spatial_columns', []):
                 index_type = f"{Colors.MAGENTA}{index_type + ' + R-Tree' if index_type else 'R-Tree'}{Colors.RESET}"
+            elif col_name in table_info.get('text_columns', []):
+                index_type = f"{Colors.CYAN}{index_type + ' + Inverted' if index_type else 'Inverted'}{Colors.RESET}"
             elif index_type:
                 index_type = f"{Colors.BLUE}{index_type}{Colors.RESET}"
                 
-            print(f"{col_name:<20} | {col_type:<15} | {is_pk:<5} | {index_type:<10}")
+            print(f"{col_name:<20} | {col_type:<15} | {is_pk:<5} | {index_type:<15}")
     
     def do_stats(self, arg):
         """Muestra estadísticas de una tabla."""
@@ -267,6 +272,17 @@ Para salir, escriba '{Colors.WHITE}exit{Colors.WHITE}' o '{Colors.WHITE}quit{Col
                         print(f"{Colors.GREEN}  límites: ({b[0]:.1f}, {b[1]:.1f}) a ({b[2]:.1f}, {b[3]:.1f}){Colors.RESET}")
                     else:
                         print(f"{Colors.GREEN}  {stat_name}{Colors.RESET}: {stat_value}")
+                print()
+                
+        # Información de índices invertidos
+        if 'text_indexes' in table_info and table_info['text_indexes']:
+            print(f"\n{Colors.BOLD}{Colors.CYAN}Índices invertidos:{Colors.RESET}")
+            print(f"{Colors.CYAN}{'-' * 50}{Colors.RESET}")
+            
+            for col, stats in table_info['text_indexes'].items():
+                print(f"{Colors.YELLOW}Columna: {col}{Colors.RESET}")
+                for stat_name, stat_value in stats.items():
+                    print(f"{Colors.GREEN}  {stat_name}{Colors.RESET}: {stat_value}")
                 print()
     
     def do_exit(self, arg):

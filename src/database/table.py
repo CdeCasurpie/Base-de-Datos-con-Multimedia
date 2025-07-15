@@ -49,6 +49,7 @@ class Table:
         page_size,
         index_type="bplus_tree",
         spatial_columns=None,
+        text_columns=None,
         file_path=None,
         data_dir=os.path.join(os.getcwd(), "data"),
         from_table=False,
@@ -64,6 +65,8 @@ class Table:
         self.record_count = 0
         self.index = None
         self.spatial_columns = spatial_columns or []
+        self.text_columns = text_columns or []
+        self.text_indexes = {}
         self.spatial_indexes = {}
 
 
@@ -130,12 +133,31 @@ class Table:
         table.pack_string = metadata.get("pack_string", "")
         table.record_count = metadata.get("record_count", 0)
         table.spatial_columns = metadata.get("spatial_columns", [])
+        table.text_columns = metadata.get("text_columns", [])
 
         # Create index
         table._create_primary_index()
         table._create_spatial_indexes()
+        table._create_text_indexes()
 
         return table
+    
+    def _create_text_indexes(self):
+        """Crea índices de texto para las columnas especificadas."""
+        for column in self.text_columns:
+            if column in self.columns:
+                col_type = self.columns[column]
+                if col_type == "VARCHAR" or col_type.startswith("VARCHAR"):
+                    self.text_indexes[column] = InvertedIndex(
+                        table_name=self.name,
+                        column_name=column,
+                        data_path=self.data_path,
+                        table_ref=self,
+                        page_size=self.page_size,
+                    )
+                    print(f"Índice de texto creado para columna: {column}")
+
+                    
     
     def _create_primary_index(self):
         """
@@ -186,6 +208,7 @@ class Table:
             "record_count": self.record_count,
             "pack_string": self.pack_string,
             "spatial_columns": self.spatial_columns,
+            "text_columns": self.text_columns,
         }
         with open(self.metadata_path, "w") as f:
             json.dump(metadata, f, indent=4)
@@ -284,6 +307,13 @@ class Table:
                 except Exception as e:
                     print(f"Error adding spatial index for {column}: {e}")
 
+        for column, text_index in getattr(self, 'text_indexes', {}).items():
+            if column in record:
+                try:
+                    text_index.add(record, primary_key_value)
+                except Exception as e:
+                    print(f"Error adding text index for {column}: {e}")
+
         # Update record count
         self.record_count += 1
 
@@ -320,6 +350,13 @@ class Table:
                 spatial_index.remove(value)
             except Exception as e:
                 print(f"Warning: Error removing from spatial index: {e}")
+
+        # Remove from text indexes
+        for text_index in self.text_indexes.values():
+            try:
+                text_index.remove(value)
+            except Exception as e:
+                print(f"Warning: Error removing from text index: {e}")
 
         # Remove the record from the primary index
         try:
@@ -633,10 +670,6 @@ class Table:
         # Add the record to the index
         self.index.add(record, primary_key_value)
 
-        # Add to inverted index
-        if hasattr(self, "inverted_index"):
-            self.inverted_index.add(record, primary_key_value)
-
         # Serialize the record
         for column, spatial_index in self.spatial_indexes.items():
             if column in record:
@@ -644,6 +677,13 @@ class Table:
                     spatial_index.add(record, primary_key_value)
                 except Exception as e:
                     print(f"Error adding spatial index for {column}: {e}")
+
+        for column, text_index in self.text_indexes.items():
+            if column in record:
+                try:
+                    text_index.add(record, primary_key_value)
+                except Exception as e:
+                    print(f"Error adding text index for {column}: {e}")
 
         # Update record count
         self.record_count += 1
@@ -682,12 +722,11 @@ class Table:
             except Exception as e:
                 print(f"Warning: Error removing from spatial index: {e}")
 
-        # Remove from inverted index
-        if hasattr(self, "inverted_index"):
+        for text_index in self.text_indexes.values():
             try:
-                self.inverted_index.remove(value)
+                text_index.remove(value)
             except Exception as e:
-                print(f"Warning: Error removing from inverted index: {e}")
+                print(f"Warning: Error removing from text index: {e}")
 
         # Remove the record from the primary index
         try:
@@ -713,21 +752,21 @@ class Table:
         Returns:
             dict o list: Registro encontrado (si es primary key) o lista de registros
         """
-        if hasattr(self, "inverted_index"):
-            return self.inverted_index.search(value)
+        if column in self.text_indexes:
+            return self.text_indexes[column].search(value)
         else:
-            raise ValueError(f"No inverted index found for table {self.name}")
+            raise ValueError(f"No inverted index found for column {column}")
 
     def range_search_inverted_index(self, column, begin_key, end_key):
         """Búsqueda por rango usando el índice invertido."""
-        if hasattr(self, "inverted_index"):
-            return self.inverted_index.range_search(begin_key, end_key)
+        if column in self.text_indexes:
+            return self.text_indexes[column].range_search(begin_key, end_key)
         else:
-            raise ValueError(f"No inverted index found for table {self.name}")
+            raise ValueError(f"No inverted index found for column {column}")
 
     def get_inverted_index_stats(self):
         """Obtiene estadísticas del índice invertido."""
-        if hasattr(self, "inverted_index"):
-            return self.inverted_index.get_stats()
-        else:
-            raise ValueError(f"No inverted index found for table {self.name}")
+        stats = {}
+        for column, text_index in self.text_indexes.items():
+            stats[column] = text_index.get_stats()
+        return stats

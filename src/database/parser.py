@@ -356,12 +356,55 @@ def parse_where_clause(where_clause):
     - column intersects geometry (intersección geométrica)
     - column nearest point [limit k] (k vecinos más cercanos)
     - column in_range (min_point, max_point) (rango espacial)
+    - column CONTAINS term (búsqueda de texto por término)
+    - column CONTAINS term1 AND/OR term2 (búsqueda booleana de texto)
+    - column RANKED BY query (búsqueda por relevancia de texto)
     
     Retorna diccionario con 'error_message' (None si no hay error).
     """
     where_clause = where_clause.strip()
     
     try:
+        # Búsqueda de texto: CONTAINS para términos simples o operadores booleanos
+        contains_pattern = r'(\w+)\s+CONTAINS\s+([\'"]?.+?[\'"]?)$'
+        match = re.match(contains_pattern, where_clause, re.IGNORECASE)
+        if match:
+            column = match.group(1)
+            query = match.group(2).strip()
+            
+            # Eliminar comillas si existen
+            if (query.startswith('"') and query.endswith('"')) or \
+               (query.startswith("'") and query.endswith("'")):
+                query = query[1:-1]
+            
+            return {
+                'condition_type': 'TEXT_CONTAINS',
+                'column': column,
+                'query': query,
+                'error_message': None
+            }
+        
+        # Búsqueda de texto por relevancia: RANKED BY
+        ranked_pattern = r'(\w+)\s+RANKED\s+BY\s+([\'"]?.+?[\'"]?)(?:\s+LIMIT\s+(\d+))?$'
+        match = re.match(ranked_pattern, where_clause, re.IGNORECASE)
+        if match:
+            column = match.group(1)
+            query = match.group(2).strip()
+            limit = int(match.group(3)) if match.group(3) else 5  # Default limit 5
+            
+            # Eliminar comillas si existen
+            if (query.startswith('"') and query.endswith('"')) or \
+               (query.startswith("'") and query.endswith("'")):
+                query = query[1:-1]
+            
+            return {
+                'condition_type': 'TEXT_RANKED',
+                'column': column,
+                'query': query,
+                'limit': limit,
+                'error_message': None
+            }
+            
         # Búsqueda espacial: WITHIN (punto, radio)
         within_pattern = r'(\w+)\s+within\s*\(\s*(.+?)\s*,\s*(\d+(?:\.\d+)?)\s*\)'
         match = re.match(within_pattern, where_clause, re.IGNORECASE)
