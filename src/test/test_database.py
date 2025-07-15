@@ -2,13 +2,9 @@
 
 import os
 import sys
-import json
 import readline  # Para historial de comandos
 import cmd
-from rich.console import Console
-from rich.table import Table as RichTable
-from rich.panel import Panel
-from rich.syntax import Syntax
+import json
 
 # Añadir el directorio padre al path para poder importar módulos
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,23 +25,19 @@ Para salir, escriba 'exit' o 'quit'.
     
     def __init__(self):
         super().__init__()
-        self.console = Console()
         self.db = Database()
-        self.print_banner()
+        print(self.intro)
+        self.print_status()
     
-    def print_banner(self):
-        banner = Panel("[bold blue]Sistema de Gestión de Base de Datos[/bold blue]\n"
-                       "[green]Con soporte para índices espaciales[/green]", 
-                       expand=False)
-        self.console.print(banner)
-        
-        # Mostrar tablas cargadas
+    def print_status(self):
+        """Muestra el estado actual de la base de datos"""
         tables = self.db.list_tables()
         if tables:
-            self.console.print(f"[green]✓[/green] Base de datos cargada con {len(tables)} tablas")
-            self.console.print(", ".join([f"[yellow]{t}[/yellow]" for t in tables]))
+            print(f"Base de datos cargada con {len(tables)} tablas:")
+            for table in tables:
+                print(f"  - {table}")
         else:
-            self.console.print("[yellow]Base de datos sin tablas. Use 'CREATE TABLE' para crear una nueva.[/yellow]")
+            print("Base de datos sin tablas. Use 'CREATE TABLE' para crear una nueva.")
     
     def emptyline(self):
         """No hacer nada en línea vacía."""
@@ -60,231 +52,200 @@ Para salir, escriba 'exit' o 'quit'.
         try:
             results, error = self.db.execute_query(line)
             if error:
-                self.console.print(f"[bold red]Error:[/bold red] {error}")
+                print(f"ERROR: {error}")
             elif isinstance(results, list):
                 self.print_results(results)
             else:
-                self.console.print(f"[green]✓[/green] {results}")
+                print(f"✓ {results}")
         except Exception as e:
-            self.console.print(f"[bold red]Error inesperado:[/bold red] {e}")
+            print(f"Error inesperado: {e}")
     
     def print_results(self, results):
-        """Mostrar resultados en formato de tabla."""
+        """Muestra resultados en formato de tabla."""
         if not results:
-            self.console.print("[yellow]No se encontraron resultados[/yellow]")
+            print("No se encontraron resultados")
             return
         
-        # Crear tabla enriquecida
         if isinstance(results, list) and results:
-            # Obtener columnas del primer resultado
+            # Obtener columnas del primer registro
             columns = list(results[0].keys())
             
-            table = RichTable(title=f"Resultados ({len(results)} registros)")
-            
-            # Añadir columnas
+            # Calcular ancho para cada columna
+            column_widths = {}
             for col in columns:
-                table.add_column(col, style="cyan")
-            
-            # Añadir filas
-            for record in results:
-                row = []
-                for col in columns:
-                    value = record.get(col, "")
-                    # Formatear según tipo de dato
-                    if isinstance(value, (int, float)):
-                        row.append(str(value))
-                    elif isinstance(value, bool):
-                        row.append("true" if value else "false")
-                    elif value is None:
-                        row.append("NULL")
-                    else:
-                        # Truncar strings largos
-                        if len(str(value)) > 50:
-                            row.append(str(value)[:47] + "...")
-                        else:
-                            row.append(str(value))
+                # Inicializar con el ancho del nombre de columna
+                column_widths[col] = len(str(col))
                 
-                table.add_row(*row)
+                # Actualizar con el ancho máximo de los valores
+                for record in results:
+                    val = str(record.get(col, ""))
+                    if len(val) > column_widths[col]:
+                        # Limitar a 30 caracteres
+                        column_widths[col] = min(30, len(val))
             
-            self.console.print(table)
+            # Imprimir cabecera
+            header_row = " | ".join(col.ljust(column_widths[col]) for col in columns)
+            print("=" * len(header_row))
+            print(header_row)
+            print("=" * len(header_row))
+            
+            # Imprimir datos
+            for record in results:
+                row_values = []
+                for col in columns:
+                    val = str(record.get(col, ""))
+                    # Truncar valores largos
+                    if len(val) > column_widths[col]:
+                        val = val[:column_widths[col]-3] + "..."
+                    row_values.append(val.ljust(column_widths[col]))
+                print(" | ".join(row_values))
+            
+            print("=" * len(header_row))
+            print(f"Total de registros: {len(results)}")
         else:
             # Mostrar resultado único
-            self.console.print(results)
+            print(results)
     
     def do_help(self, arg):
         """Muestra ayuda sobre comandos disponibles."""
         if not arg:
-            self.console.print(Panel("[bold]Comandos Disponibles:[/bold]", title="Ayuda"))
-            self.console.print("""
-[bold]Comandos SQL básicos:[/bold]
-- CREATE TABLE nombre_tabla (columna1 tipo1, columna2 tipo2, ...) using index tipo_indice(primary_key)
-- CREATE TABLE nombre_tabla FROM FILE 'ruta_archivo' USING INDEX tipo_indice(primary_key) 
-- CREATE SPATIAL INDEX nombre_indice ON nombre_tabla (columna)
-- SELECT columnas FROM tabla WHERE condición
-- INSERT INTO tabla VALUES (valor1, valor2, ...)
-- DELETE FROM tabla WHERE columna = valor
-
-[bold]Tipos de índices disponibles:[/bold]
-- [green]bplus_tree[/green]: Árbol B+ balanceado
-- [green]sequential_file[/green]: Archivo secuencial con overflow
-- [green]extendible_hash[/green]: Hash extensible
-- [green]isam_sparse[/green]: ISAM con índice disperso
-
-[bold]Tipos de datos espaciales:[/bold]
-- [cyan]POINT[/cyan]: Punto 2D - Ejemplo: 'POINT(10.5 20.3)'
-- [cyan]POLYGON[/cyan]: Polígono - Ejemplo: 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'
-- [cyan]LINESTRING[/cyan]: Línea - Ejemplo: 'LINESTRING(0 0, 10 10, 20 20)'
-- [cyan]GEOMETRY[/cyan]: Cualquier geometría
-
-[bold]Consultas espaciales:[/bold]
-- SELECT * FROM tabla WHERE columna_espacial WITHIN (punto, radio)
-- SELECT * FROM tabla WHERE columna_espacial INTERSECTS geometría
-- SELECT * FROM tabla WHERE columna_espacial NEAREST punto LIMIT n
-- SELECT * FROM tabla WHERE columna_espacial IN_RANGE (punto_min, punto_max)
-
-[bold]Comandos del shell:[/bold]
-- [yellow]tables[/yellow]: Listar todas las tablas
-- [yellow]describe tabla[/yellow]: Mostrar estructura de una tabla
-- [yellow]exit[/yellow] o [yellow]quit[/yellow]: Salir del programa
-            """)
+            print("\nComandos disponibles:")
+            print("=====================")
+            print("tables         - Listar todas las tablas")
+            print("describe tabla - Mostrar estructura de una tabla")
+            print("stats tabla    - Mostrar estadísticas de una tabla")
+            print("exit, quit     - Salir del programa")
+            print("\nPuede ejecutar cualquier consulta SQL directamente:")
+            print("- CREATE TABLE nombre (columnas) USING INDEX tipo(pk)")
+            print("- SELECT * FROM tabla WHERE condicion")
+            print("- INSERT INTO tabla VALUES (valores)")
+            print("- DELETE FROM tabla WHERE condicion")
+            print("\nUso: help comando - para más información sobre un comando específico")
+        elif arg == 'tables':
+            print("Uso: tables")
+            print("Lista todas las tablas disponibles en la base de datos.")
+        elif arg == 'describe':
+            print("Uso: describe nombre_tabla")
+            print("Muestra la estructura de la tabla especificada.")
+        elif arg == 'stats':
+            print("Uso: stats nombre_tabla")
+            print("Muestra estadísticas detalladas de la tabla y sus índices.")
+        elif arg in ['exit', 'quit']:
+            print("Uso: exit | quit")
+            print("Sale del programa.")
         else:
-            # Mostrar ayuda para un comando específico
-            if arg == 'create':
-                self.console.print(Panel("""
-[bold]CREATE TABLE nombre_tabla (columna1 tipo1 [KEY] [INDEX tipo_indice], ...)[/bold]
-    Crea una nueva tabla con las columnas especificadas.
-
-[bold]CREATE TABLE nombre_tabla FROM FILE 'ruta_archivo' USING INDEX tipo_indice(primary_key)[/bold]
-    Crea una tabla cargando datos desde un archivo JSON o CSV.
-
-[bold]CREATE SPATIAL INDEX nombre_indice ON nombre_tabla (columna)[/bold]
-    Crea un índice espacial para una columna existente.
-
-[bold]Ejemplos:[/bold]
-    CREATE TABLE Usuarios (id INT KEY INDEX btree, nombre VARCHAR(50), edad INT);
-    CREATE TABLE Restaurantes (id INT KEY, nombre VARCHAR(50), ubicacion POINT SPATIAL INDEX);
-                """, title="CREATE - Ayuda"))
-            elif arg == 'select':
-                self.console.print(Panel("""
-[bold]SELECT columnas FROM tabla [WHERE condición][/bold]
-    Consulta registros en una tabla.
-
-[bold]Consultas espaciales:[/bold]
-    SELECT * FROM tabla WHERE columna WITHIN (punto, radio)
-    SELECT * FROM tabla WHERE columna INTERSECTS geometría
-    SELECT * FROM tabla WHERE columna NEAREST punto LIMIT n
-    SELECT * FROM tabla WHERE columna IN_RANGE (punto_min, punto_max)
-
-[bold]Ejemplos:[/bold]
-    SELECT * FROM Usuarios WHERE edad >= 18;
-    SELECT nombre, direccion FROM Restaurantes WHERE ubicacion WITHIN ((40.7, -74.0), 5.0);
-                """, title="SELECT - Ayuda"))
-            else:
-                # Llamar a la implementación original para otros comandos
-                super().do_help(arg)
+            # Fallback a la ayuda estándar
+            super().do_help(arg)
     
     def do_tables(self, arg):
         """Lista todas las tablas en la base de datos."""
         tables = self.db.list_tables()
         
         if not tables:
-            self.console.print("[yellow]No hay tablas en la base de datos[/yellow]")
+            print("No hay tablas en la base de datos")
             return
         
-        table = RichTable(title="Tablas")
-        table.add_column("Nombre", style="cyan")
-        table.add_column("Registros", style="green")
-        table.add_column("Índice", style="yellow")
-        table.add_column("Columnas", style="blue")
+        print("\nTablas disponibles:")
+        print("===================")
         
         for table_name in tables:
-            table_obj = self.db.get_table(table_name)
-            record_count = table_obj.get_record_count()
-            index_type = table_obj.index_type
-            column_count = len(table_obj.columns)
-            
-            # Destacar tablas con índices espaciales
-            if table_obj.spatial_columns:
-                table.add_row(
-                    f"[bold]{table_name}[/bold]", 
-                    str(record_count),
-                    f"{index_type} + [cyan]spatial[/cyan]",
-                    f"{column_count} ({', '.join(table_obj.spatial_columns)})"
-                )
-            else:
-                table.add_row(table_name, str(record_count), index_type, str(column_count))
-        
-        self.console.print(table)
+            try:
+                table_info = self.db.get_table_info(table_name)
+                record_count = table_info.get('record_count', 0)
+                index_type = table_info.get('index_type', 'unknown')
+                
+                # Destacar tablas con índices espaciales
+                if table_info.get('spatial_columns'):
+                    print(f"* {table_name} - {record_count} registros - {index_type} + spatial")
+                else:
+                    print(f"  {table_name} - {record_count} registros - {index_type}")
+            except:
+                print(f"  {table_name} - [error al obtener información]")
     
     def do_describe(self, arg):
         """Muestra la estructura detallada de una tabla."""
         if not arg:
-            self.console.print("[bold red]Error: Debe especificar un nombre de tabla[/bold red]")
-            self.console.print("Uso: [yellow]describe nombre_tabla[/yellow]")
+            print("ERROR: Debe especificar un nombre de tabla")
+            print("Uso: describe nombre_tabla")
             return
         
         table_name = arg.strip()
         table_info = self.db.get_table_info(table_name)
         
         if not table_info:
-            self.console.print(f"[bold red]Error: Tabla '{table_name}' no encontrada[/bold red]")
+            print(f"ERROR: Tabla '{table_name}' no encontrada")
             return
         
-        # Panel de información general
-        general_info = f"""[bold]Tabla:[/bold] {table_info['name']}
-[bold]Registros:[/bold] {table_info['record_count']}
-[bold]Índice primario:[/bold] {table_info['index_type']} en columna '{table_info['primary_key']}'
-[bold]Columnas espaciales:[/bold] {', '.join(table_info['spatial_columns']) if table_info['spatial_columns'] else 'Ninguna'}
-"""
-
-        if 'index_info' in table_info:
-            for key, value in table_info['index_info'].items():
-                general_info += f"[bold]{key}:[/bold] {value}\n"
+        print(f"\nEstructura de tabla: {table_name}")
+        print("=" * 50)
         
-        self.console.print(Panel(general_info, title=f"Información de {table_name}"))
+        print(f"Registros: {table_info['record_count']}")
+        print(f"Índice primario: {table_info['index_type']} en '{table_info['primary_key']}'")
         
-        # Tabla de columnas
-        columns_table = RichTable(title="Estructura")
-        columns_table.add_column("Columna", style="cyan")
-        columns_table.add_column("Tipo", style="green")
-        columns_table.add_column("Clave", style="yellow")
-        columns_table.add_column("Índice", style="blue")
+        if table_info.get('spatial_columns'):
+            print(f"Columnas espaciales: {', '.join(table_info['spatial_columns'])}")
+        
+        print("\nColumnas:")
+        print("-" * 50)
+        print(f"{'Nombre':<20} | {'Tipo':<15} | {'Clave':<5} | {'Índice':<10}")
+        print("-" * 50)
         
         for col_name, col_type in table_info['columns'].items():
-            is_primary = "PRIMARY" if col_name == table_info['primary_key'] else ""
-            has_index = table_info['index_type'] if col_name == table_info['primary_key'] else ""
+            is_pk = "PK" if col_name == table_info['primary_key'] else ""
+            index_type = table_info['index_type'] if col_name == table_info['primary_key'] else ""
             
-            # Destacar columnas espaciales
+            # Añadir indicador espacial
             if col_name in table_info.get('spatial_columns', []):
-                columns_table.add_row(
-                    f"[bold]{col_name}[/bold]", 
-                    f"[cyan]{col_type}[/cyan]",
-                    is_primary,
-                    f"{has_index} [cyan]R-Tree[/cyan]" if has_index else "[cyan]R-Tree[/cyan]"
-                )
-            else:
-                columns_table.add_row(col_name, col_type, is_primary, has_index)
+                index_type = (index_type + " + R-Tree") if index_type else "R-Tree"
+                
+            print(f"{col_name:<20} | {col_type:<15} | {is_pk:<5} | {index_type:<10}")
+    
+    def do_stats(self, arg):
+        """Muestra estadísticas de una tabla."""
+        if not arg:
+            print("ERROR: Debe especificar un nombre de tabla")
+            print("Uso: stats nombre_tabla")
+            return
         
-        self.console.print(columns_table)
+        table_name = arg.strip()
+        table_info = self.db.get_table_info(table_name)
+        
+        if not table_info:
+            print(f"ERROR: Tabla '{table_name}' no encontrada")
+            return
+        
+        print(f"\nEstadísticas de tabla: {table_name}")
+        print("=" * 50)
+        
+        # Información básica
+        print(f"Total de registros: {table_info['record_count']}")
+        
+        # Información del índice primario
+        print(f"\nÍndice primario ({table_info['index_type']}):")
+        print("-" * 50)
+        
+        idx_info = table_info.get('index_info', {})
+        for key, value in idx_info.items():
+            print(f"{key}: {value}")
         
         # Información de índices espaciales
         if 'spatial_indexes' in table_info and table_info['spatial_indexes']:
-            self.console.print("\n[bold]Índices espaciales:[/bold]")
-            for column, stats in table_info['spatial_indexes'].items():
-                spatial_info = f"""[bold]Columna:[/bold] {column}
-[bold]Dimensiones:[/bold] {stats.get('dimension', 'N/A')}D
-[bold]Entradas:[/bold] {stats.get('total_entries', 'N/A')}
-[bold]Capacidad de nodo hoja:[/bold] {stats.get('leaf_capacity', 'N/A')}"""
-                
-                if 'bounds' in stats and stats['bounds']:
-                    bounds = stats['bounds']
-                    spatial_info += f"\n[bold]Límites:[/bold] ({bounds[0]:.1f}, {bounds[1]:.1f}) a ({bounds[2]:.1f}, {bounds[3]:.1f})"
-                
-                self.console.print(Panel(spatial_info, title=f"R-Tree {column}"))
+            print("\nÍndices espaciales:")
+            print("-" * 50)
+            
+            for col, stats in table_info['spatial_indexes'].items():
+                print(f"Columna: {col}")
+                for stat_name, stat_value in stats.items():
+                    if stat_name == 'bounds' and stat_value:
+                        b = stat_value
+                        print(f"  límites: ({b[0]:.1f}, {b[1]:.1f}) a ({b[2]:.1f}, {b[3]:.1f})")
+                    else:
+                        print(f"  {stat_name}: {stat_value}")
+                print()
     
     def do_exit(self, arg):
-        """Salir del programa."""
-        self.console.print("[green]¡Hasta pronto![/green]")
+        """Sale del programa."""
+        print("¡Hasta pronto!")
         return True
     
     def do_quit(self, arg):
@@ -296,14 +257,6 @@ Para salir, escriba 'exit' o 'quit'.
     do_desc = do_describe
 
 if __name__ == "__main__":
-    try:
-        # Intentar importar rich para interfaz más agradable
-        from rich import print as rprint
-    except ImportError:
-        # Si no está instalado rich
-        print("Nota: Instala el paquete 'rich' para una mejor experiencia:")
-        print("    pip install rich")
-    
     try:
         DatabaseShell().cmdloop()
     except KeyboardInterrupt:
