@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.table import Table
 
 # Tamaño de página pequeño para probar la estructura del archivo secuencial con reorganizaciones frecuentes
-PAGE_SIZE = 128
+PAGE_SIZE = 4096
 
 def clear_screen():
     """Limpia la pantalla de la consola"""

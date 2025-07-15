@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.table import Table
 
-PAGE_SIZE = 256
+PAGE_SIZE = 4096
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')

@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.table import Table
 
 # Tamaño de página muy pequeño para probar el comportamiento del B+ tree con divisiones frecuentes
-PAGE_SIZE = 128  # Tamaño de página pequeño para ver splits frecuentes
+PAGE_SIZE = 4096  # Tamaño de página pequeño para ver splits frecuentes
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
