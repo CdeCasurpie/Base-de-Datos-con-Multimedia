@@ -235,6 +235,9 @@ response = client.send_query("CREATE TABLE docs (id INT KEY, content VARCHAR(100
 ![Frontend Búsqueda](FRONTEND2.jpg)
 ![Frontend Resultados](FRONTEND3.jpg)
 ![Frontend Multimedia](FRONTEND4.jpg)
+![Frontend Audio](rokola.jpg)
+![Frontend Audio](rokola2.jpg)
+![Frontend Audiofinal](rokola3.jpg)
 
 ---
 
