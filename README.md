@@ -284,6 +284,22 @@ python -m bibliopage.app               # Puerto 5002
 
 ## 5. Experimentación y Evaluación de Rendimiento
 
+
+### Maldición de la Dimensionalidad
+
+A medida que aumenta el número de dimensiones en los vectores, el rendimiento de las búsquedas por similitud disminuye.  
+Las distancias se vuelven menos significativas y las consultas más costosas.
+
+### Estrategias para mitigarla
+
+- **Reducción de dimensiones** (ejemplo: PCA, autoencoders).  
+- **Índices aproximados** (como IVF o HNSW).  
+- **Filtrado previo** para reducir candidatos antes de calcular distancias exactas.
+- **Clusterización** de datos para agrupar elementos similares y reducir el espacio de búsqueda.
+
+Estas técnicas permiten mantener la eficiencia sin perder precisión
+
+
 ### 5.1 Metodología de Pruebas
 
 Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y reales:
