@@ -690,37 +690,7 @@ class BPlusTree(IndexBase):
         return True, parent_underflow
     
     def rebuild(self):
-        """Reorganiza la estructura del índice"""
-        old_index_file = self.index_file
-        old_metadata_file = self.metadata_file
-        
-        self.index_file = f"{old_index_file}.rebuild"
-        self.metadata_file = f"{old_metadata_file}.rebuild"
-        
-        self.root_page_id = None
-        self.height = 0
-        self.num_pages = 0
-        
-        self._init_index()
-        
-        all_records = self.get_all()
-        
-        for record in all_records:
-            key = record[self.column_name]
-            record_pos = 0  # Esto necesitaría ser la posición real
-            self.add(key, record_pos)
-        
-        import os
-        if os.path.exists(old_index_file):
-            os.remove(old_index_file)
-        if os.path.exists(old_metadata_file):
-            os.remove(old_metadata_file)
-        
-        os.rename(self.index_file, old_index_file)
-        os.rename(self.metadata_file, old_metadata_file)
-        
-        self.index_file = old_index_file
-        self.metadata_file = old_metadata_file
+        pass
     
     def get_all(self):
         """Obtiene todos los registros en el índice"""
