@@ -584,7 +584,6 @@ def who_do_i_look_like():
                     else:
                         similarity_percentage = 65 + (similarity_score * 25)
 
-                # Asegurar rango entre 60% y 97%
                 similarity_percentage = max(60, min(similarity_percentage, 97))
 
                 print(f"DEBUG: Usuario {name} calculado: {similarity_percentage}%")
