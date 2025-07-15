@@ -572,11 +572,7 @@ class Database:
                     multimedia_index.initialize(media_type=media_type, method=method)
 
                     # Indexar registros existentes en la tabla
-                    print(f"DEBUG: Indexando los registros existentes en la tabla...")
                     records = table.get_all()
-                    print(
-                        f"DEBUG: Se encontraron {len(records)} registros para indexar"
-                    )
 
                     for i, record in enumerate(records):
                         if column_name in record and record[column_name]:
@@ -590,15 +586,10 @@ class Database:
                                         "\x00"
                                     )
 
-                                print(
-                                    f"DEBUG: Indexando registro {i+1}/{len(records)} - Key: {key}, Path: {image_path}"
-                                )
                                 try:
-                                    multimedia_index.add(key, image_path)
+                                    multimedia_index.add(record, key)
                                 except Exception as e:
-                                    print(f"DEBUG: Error indexando registro {key}: {e}")
-
-                    print(f"DEBUG: Indexación de registros existentes completada")
+                                    print(f"Error indexando registro {key}: {e}")
 
                     return (
                         f"Índice multimedia creado exitosamente para '{column_name}' con método '{method}'",
@@ -751,10 +742,6 @@ class Database:
                         query_file = parsed["query_file"]
                         limit = parsed.get("limit", 5)
 
-                        print(
-                            f"DEBUG: Ejecutando MULTIMEDIA_SIMILARITY en columna '{column}' con archivo '{query_file}'"
-                        )
-
                         # Verificar que existe el índice multimedia
                         multimedia_index = None
                         if hasattr(table, "indexes") and table.indexes:
@@ -786,16 +773,11 @@ class Database:
 
                         # Ejecutar búsqueda por similitud
                         try:
-                            print(f"DEBUG: Ejecutando knn_search con k={limit}")
                             similarity_results = multimedia_index.knn_search(
                                 query_file, k=limit
                             )
-                            print(
-                                f"DEBUG: KNN retornó {len(similarity_results) if similarity_results else 0} resultados"
-                            )
 
                             if not similarity_results:
-                                print("DEBUG: similarity_results está vacío")
                                 return (
                                     [],
                                     None,
@@ -803,23 +785,13 @@ class Database:
 
                             # Convertir resultados a registros completos
                             results = []
-                            print(
-                                f"DEBUG: Procesando {len(similarity_results)} resultados de similitud"
-                            )
 
                             for i, (vector_id, distance) in enumerate(
                                 similarity_results
                             ):
-                                print(
-                                    f"DEBUG: Procesando resultado {i}: vector_id={vector_id}, distance={distance}"
-                                )
-
                                 # Buscar registro completo por ID
                                 try:
-                                    record = table.get_by_primary_key(vector_id)
-                                    print(
-                                        f"DEBUG: Registro encontrado: {record is not None}"
-                                    )
+                                    record = table.search(table.primary_key, vector_id)
 
                                     if record:
                                         # Convertir tupla a diccionario si es necesario
@@ -830,9 +802,6 @@ class Database:
                                         elif isinstance(record, dict):
                                             record_dict = record.copy()
                                         else:
-                                            print(
-                                                f"DEBUG: Tipo de record inesperado: {type(record)}"
-                                            )
                                             continue
 
                                         # Añadir distancia de similitud
@@ -841,32 +810,15 @@ class Database:
                                             1.0 + distance
                                         )  # Score normalizado
                                         results.append(record_dict)
-                                        print(
-                                            f"DEBUG: Agregado resultado {i} con score {record_dict['_similarity_score']:.4f}"
-                                        )
-                                    else:
-                                        print(
-                                            f"DEBUG: No se encontró registro para vector_id={vector_id}"
-                                        )
                                 except Exception as e:
-                                    print(
-                                        f"DEBUG: Error procesando vector_id {vector_id}: {e}"
-                                    )
                                     continue
 
                             # Ordenar por distancia (menor distancia = mayor similitud)
                             results.sort(key=lambda x: x["_similarity_distance"])
-                            print(
-                                f"DEBUG: Retornando {len(results)} resultados finales"
-                            )
 
                             return results, None
 
                         except Exception as e:
-                            print(f"DEBUG: Error en búsqueda por similitud: {str(e)}")
-                            import traceback
-
-                            traceback.print_exc()
                             return None, f"Error en búsqueda por similitud: {str(e)}"
 
                     # Búsqueda por rango
@@ -1687,16 +1639,50 @@ class Database:
             print(f"DEBUG: Indexando registros existentes en tabla '{table_name}'...")
             records = table.get_all()
             print(f"DEBUG: Encontrados {len(records)} registros para indexar")
+            print(
+                f"DEBUG: Primeros 2 records: {records[:2] if len(records) > 0 else 'ninguno'}"
+            )
+            print(
+                f"DEBUG: Tipo del primer record: {type(records[0]) if len(records) > 0 else 'ninguno'}"
+            )
 
-            for record in records:
-                if column_name in record and record[column_name]:
-                    key = (
-                        record[table.primary_key]
-                        if table.primary_key
-                        else record.get("id", len(records))
+            for i, record in enumerate(records):
+                try:
+                    print(f"DEBUG: Tipo de record: {type(record)}")
+                    print(
+                        f"DEBUG: Record keys: {list(record.keys()) if isinstance(record, dict) else 'No es dict'}"
                     )
-                    print(f"DEBUG: Indexando registro con key={key}")
-                    multimedia_index.add(record, key)
+                    print(f"DEBUG: table.primary_key: {table.primary_key}")
+
+                    if column_name in record and record[column_name]:
+                        # Obtener la clave primaria del registro
+                        key = (
+                            record[table.primary_key]
+                            if table.primary_key
+                            else record.get("id", i + 1)
+                        )
+
+                        # Obtener el path de la imagen desde el registro
+                        image_path = record[column_name]
+                        if isinstance(image_path, bytes):
+                            image_path = image_path.decode("utf-8").rstrip("\x00")
+
+                        print(
+                            f"DEBUG: Indexando registro {i+1}/{len(records)} - Key: {key}, Path: {image_path}"
+                        )
+
+                        # Agregar al índice multimedia (record completo y key)
+                        multimedia_index.add(record, key)
+                    else:
+                        print(
+                            f"DEBUG: Registro {i+1} no tiene columna {column_name} o está vacía"
+                        )
+
+                except Exception as e:
+                    print(f"DEBUG: Error indexando registro {i+1}: {e}")
+                    import traceback
+
+                    traceback.print_exc()
 
             print(
                 f"DEBUG: Indexación completada. Total vectores: {multimedia_index.count()}"
