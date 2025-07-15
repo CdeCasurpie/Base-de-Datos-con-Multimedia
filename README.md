@@ -125,6 +125,39 @@ python -m TestApp.main
 
 **Nota:** Los tests requieren dependencias instaladas localmente (recomendado Python 3.10+)
 
+## Implementación del Índice Invertido y Multimedial
+
+Para esta implementación se desarrollaron dos nuevos tipos de índices junto con una clase adicional de almacenamiento de datos multimediales:
+
+---
+
+### `InvertedIndex`
+Gestiona un índice invertido tradicional para realizar búsquedas eficientes por palabras clave.  
+Es ideal para estructuras textuales o contenidos que requieren recuperación basada en términos.
+
+---
+
+### `MultimediaIndex`
+Diseñado para manejar contenido multimedial como imágenes y audio. Este índice se divide en dos componentes principales:
+
+##### `FeatureExtractor`
+Clase **abstracta** que define la interfaz para la extracción de características.  
+Su objetivo es trabajar con **vectores n-dimensionales grandes**, mejorando la calidad de las búsquedas por similitud (a diferencia de vectores pequeños poco representativos).  
+Implementaciones concretas:
+- `ImageExtractor`: procesa imágenes y extrae características visuales.
+- `AudioExtractor`: procesa archivos de audio y extrae características relevantes.
+
+##### `VectorIndex`
+Encargado de almacenar los vectores generados por el `FeatureExtractor`, y de ejecutar operaciones de comparación y **búsqueda por similitud** entre vectores.
+
+---
+
+#### `MultimediaStore`
+Clase que gestiona el almacenamiento de archivos multimediales.  
+En lugar de guardar directamente los bits de los archivos en la base de datos o en memoria, se **mapean rutas absolutas** a los archivos (imágenes o audios) ubicados en una carpeta específica del proyecto.
+
+Este enfoque permite un uso eficiente de los recursos y facilita la gestión de los datos sin sobrecargar la base de datos ni la memoria del sistema.
+
 ### Tests de estructuras de índices:
 ```bash
 python -m HeiderDB.test.test_btree          # B+ Tree
