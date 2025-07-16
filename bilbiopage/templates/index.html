@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Biblioteca Multimedia</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="buscador-section" id="buscador-section">
+        <h1>¡Bienvenido a la biblioteca!</h1>
+        <p>Haz la busqueda que quieras</p>
+        <div class="buscador-bar">
+            <input type="text" id="busqueda" placeholder="Buscar...">
+            <button id="btn-buscar">Buscar</button>
+        </div>
+    </div>
+    <!-- RESULTADOS ARRIBA DEL VIDEO -->
+    <div id="resultados-section" style="display:none;">
+        <div id="resultados-lista"></div>
+        <div id="paginacion"></div>
+        <button id="btn-nueva-busqueda">Nueva búsqueda</button>
+    </div>
+    <div class="video-section">
+        <video id="video-biblioteca" autoplay muted loop>
+            <source src="{{ url_for('static', filename='video/videomenu.mp4') }}" type="video/mp4">
+            <source src="{{ url_for('static', filename='video/videomenu.webm') }}" type="video/webm">
+            Tu navegador no soporta el video.
+        </video>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
