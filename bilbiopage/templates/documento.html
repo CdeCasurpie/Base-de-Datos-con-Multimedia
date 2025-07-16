@@ -3,13 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ doc.titulo }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background: #f8e6d0;
+            font-family: 'Georgia', serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .volver-btn {
+            margin-top: 30px;
+            margin-bottom: 10px;
+            background: #fffbe6;
+            color: #7c4a03;
+            border: 2px solid #d2b48c;
+            border-radius: 10px;
+            padding: 10px 28px;
+            font-size: 1.1em;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 2px 8px #d2b48c33;
+            transition: background 0.2s, color 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .volver-btn:hover {
+            background: #f3e1b6;
+            color: #b97a1a;
+        }
+        .scroll-container {
+            background: #fdf6e3;
+            border: 4px solid #d2b48c;
+            border-radius: 30px 30px 30px 30px;
+            box-shadow: 0 8px 32px 0 rgba(60, 40, 10, 0.25), 0 1.5px 0 #e2c290 inset;
+            width: 520px;
+            min-height: 600px;
+            padding: 60px 40px 60px 40px;
+            box-sizing: border-box;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            position: relative;
+        }
+        .scroll-container:before, .scroll-container:after {
+            content: '';
+            display: block;
+            position: absolute;
+            left: 30px;
+            right: 30px;
+            height: 18px;
+            background: #f3e1b6;
+            border-radius: 10px;
+            border: 2px solid #d2b48c;
+        }
+        .scroll-container:before {
+            top: 18px;
+        }
+        .scroll-container:after {
+            bottom: 18px;
+        }
+        .titulo {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #7c4a03;
+            text-align: center;
+            text-shadow: 1px 1px 0 #fff8e1;
+        }
+        .contenido {
+            font-size: 1.1em;
+            color: #4b2e05;
+            white-space: pre-wrap;
+            text-align: justify;
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.10);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 1px 0 #e2c290 inset;
+        }
+    </style>
 </head>
 <body>
-    <div class="documento-section">
-        <h2>{{ doc.titulo }}</h2>
-        <pre>{{ doc.contenido }}</pre>
-        <a href="{{ url_for('index') }}">Volver a la búsqueda</a>
+    <a href="/" class="volver-btn">⟵ Volver</a>
+    <div class="scroll-container">
+        <div class="titulo">{{ doc.titulo }}</div>
+        <div class="contenido">{{ doc.contenido }}</div>
     </div>
 </body>
 </html> 

@@ -17,7 +17,7 @@ def run_server(host='0.0.0.0', port=54321):
         while True:
             conn, addr = s.accept()
             with conn:
-                data = conn.recv(4096).decode()
+                data = conn.recv(4096).decode(errors='ignore')
                 if not data:
                     continue
                 try:
