@@ -40,7 +40,7 @@ hypothesis/
 .dmypy.json
 .pyre/
 .pytype/
-
+temp_uploads/
 # --- Archivos de configuración de entornos/locales ---
 *.env
 *.env.*
