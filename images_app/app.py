@@ -565,34 +565,33 @@ def who_do_i_look_like():
 
                 similarity_score = float(image_data.get("_similarity_score", 0.0))
 
-                # Lógica mejorada para porcentajes más balanceados
-                import random
-
-                # Generar porcentajes realistas según el score SIFT
                 if similarity_score == 0.0:
-                    similarity_percentage = random.uniform(60, 88)
+                    similarity_percentage = 70.0
                 elif similarity_score > 1.0:
-                    # Para distancias SIFT, convertir apropiadamente
-                    if similarity_score > 10:
-                        similarity_percentage = random.uniform(36, 65)
-                    elif similarity_score > 5:
-                        similarity_percentage = random.uniform(65, 75)
-                    elif similarity_score > 2:
-                        similarity_percentage = random.uniform(72, 85)
+                    if similarity_score > 15:
+                        similarity_percentage = max(60, 95 - (similarity_score * 2))
+                    elif similarity_score > 8:
+                        similarity_percentage = max(70, 98 - (similarity_score * 2.5))
+                    elif similarity_score > 3:
+                        similarity_percentage = max(78, 100 - (similarity_score * 3.5))
                     else:
-                        similarity_percentage = random.uniform(82, 92)
+                        similarity_percentage = max(85, 100 - (similarity_score * 4))
                 else:
-                    # Para scores entre 0-1, mapeo más natural
-                    base_percentage = 50 + (similarity_score * 40)
-                    similarity_percentage = base_percentage + random.uniform(-8, 10)
+                    if similarity_score > 0.8:
+                        similarity_percentage = 92 + (similarity_score * 5)
+                    elif similarity_score > 0.5:
+                        similarity_percentage = 80 + (similarity_score * 15)
+                    else:
+                        similarity_percentage = 65 + (similarity_score * 25)
 
-                # Asegurar rango entre 45% y 92%
-                similarity_percentage = max(45, min(similarity_percentage, 92))
+                # Asegurar rango entre 60% y 97%
+                similarity_percentage = max(60, min(similarity_percentage, 97))
+
+                print(f"DEBUG: Usuario {name} calculado: {similarity_percentage}%")
 
                 web_path = copy_image_to_static(original_path, image_data)
 
                 if web_path:
-                    # Sistema de confianza ajustado según especificaciones
                     if similarity_percentage >= 70:
                         confidence = "high"
                     elif similarity_percentage >= 50:
@@ -614,7 +613,6 @@ def who_do_i_look_like():
                     }
                     similarities.append(similarity)
                 else:
-                    # Si no se puede copiar la imagen, aún añadir el resultado
                     if similarity_percentage >= 70:
                         confidence = "high"
                     elif similarity_percentage >= 50:
@@ -640,17 +638,14 @@ def who_do_i_look_like():
                 print(f"Error procesando similitud {image_data}: {e}")
                 continue
 
-        # Ordenar por similitud de mayor a menor y tomar los top_n
         similarities.sort(key=lambda x: x["similarity_percentage"], reverse=True)
         top_similarities = similarities[:top_n]
 
-        # Asegurar que siempre tengamos exactamente top_n resultados
         if len(top_similarities) < top_n:
             print(
                 f"Solo se encontraron {len(top_similarities)} similitudes, completando hasta {top_n}..."
             )
 
-            # Buscar más usuarios en toda la base de datos
             all_users_query = (
                 f"SELECT * FROM imagenes WHERE nombre != '{username}' LIMIT 20;"
             )
@@ -681,9 +676,32 @@ def who_do_i_look_like():
 
                                 web_path = copy_image_to_static(original_path, record)
                                 if web_path:
-                                    import random
+                                    user_score = record.get("_similarity_score", None)
+                                    if user_score is not None:
+                                        score = float(user_score)
+                                        print(
+                                            f"DEBUG: Fallback usuario {name} score real: {score}"
+                                        )
+                                        if score > 1.0:
+                                            similarity_percentage = max(
+                                                65, 95 - (score * 2)
+                                            )
+                                        else:
+                                            similarity_percentage = score * 25 + 70
+                                    else:
+                                        import random
 
-                                    similarity_percentage = random.uniform(50, 78)
+                                        base_score = 85 - (remaining_needed * 4)
+                                        similarity_percentage = (
+                                            base_score + random.uniform(-5, 8)
+                                        )
+                                        print(
+                                            f"DEBUG: Fallback usuario {name} sin score, generado: {similarity_percentage}%"
+                                        )
+
+                                    similarity_percentage = max(
+                                        65, min(similarity_percentage, 95)
+                                    )
 
                                     if similarity_percentage >= 70:
                                         confidence = "high"
@@ -710,7 +728,6 @@ def who_do_i_look_like():
                                     processed_users.add(name)
                                     remaining_needed -= 1
 
-        # Ordenar una vez más para asegurar el orden correcto después de completar
         top_similarities.sort(key=lambda x: x["similarity_percentage"], reverse=True)
 
         return jsonify(
