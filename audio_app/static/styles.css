@@ -1,0 +1,120 @@
+:root {
+    /* VARIABLES PARA AJUSTAR LOS HOLOGRAMAS */
+    
+    /* Holograma Superior - Debe cubrir TODA la superficie de madera */
+    --top-width: 760px;
+    --top-height: 350px;
+    --top-position-top: 11%;
+    --top-rotation: 20deg;
+    --top-perspective: 900px;
+    --top-translateZ: 30px;
+    --hologram-top-radius: 25px;
+    
+    /* Holograma Inferior - Debe cubrir TODO el área metálica rectangular */
+    --bottom-width: 420px;
+    --bottom-height: 200px;
+    --bottom-position-bottom: 27%;
+    --bottom-rotation: 5deg;
+    --bottom-perspective: 1400px;
+    --bottom-translateZ: 6px;
+    --hologram-bottom-radius: 10px;
+    
+    /* Efectos generales */
+    --hologram-color: cyan;
+    --hologram-opacity: 0.3;
+    --hologram-blur: 5px;
+    --hologram-glow: 20px;
+
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #34495e;
+    font-family: Arial, sans-serif;
+    perspective: 1000px;
+}
+
+#container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+    z-index: 100;
+}
+
+#clickHint {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 18px;
+    z-index: 100;
+}
+
+.hologram {
+    position: absolute;
+    border: 2px solid var(--hologram-color);
+    background: rgba(0, 0, 0, var(--hologram-opacity));
+    opacity: 0;
+    z-index: 1000;
+    transition: all 0.5s ease;
+    backdrop-filter: blur(var(--hologram-blur));
+    box-shadow: 0 0 var(--hologram-glow) rgba(0, 255, 255, 0.3);
+}
+
+.hologram.active {
+    opacity: 1;
+}
+
+/* Holograma superior - Con mucha perspectiva */
+.hologram-top {
+    border-radius: var(--hologram-top-radius);
+    width: var(--top-width);
+    height: var(--top-height);
+    left: 50%;
+    top: var(--top-position-top);
+    transform: translateX(-50%) 
+               perspective(var(--top-perspective)) 
+               rotateX(var(--top-rotation)) 
+               translateZ(0);
+    transform-origin: bottom center;
+}
+
+.hologram-top.active {
+    transform: translateX(-50%) 
+               perspective(var(--top-perspective)) 
+               rotateX(var(--top-rotation)) 
+               translateZ(var(--top-translateZ));
+}
+
+/* Holograma inferior - Casi sin perspectiva */
+.hologram-bottom {
+    border-radius: var(--hologram-bottom-radius);
+    width: var(--bottom-width);
+    height: var(--bottom-height);
+    left: 50%;
+    bottom: var(--bottom-position-bottom);
+    transform: translateX(-50%) 
+               perspective(var(--bottom-perspective)) 
+               rotateX(var(--bottom-rotation)) 
+               translateZ(0);
+    transform-origin: top center;
+}
+
+.hologram-bottom.active {
+    transform: translateX(-50%) 
+               perspective(var(--bottom-perspective)) 
+               rotateX(var(--bottom-rotation)) 
+               translateZ(var(--bottom-translateZ));
+}

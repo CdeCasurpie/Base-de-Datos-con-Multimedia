@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rockola 3D - Audio Similarity</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="audio-interface.css">
+</head>
+<body>
+    <div id="container">
+        <div id="loading">Cargando Rockola...</div>
+        <div id="clickHint">Haz clic en la rockola para interactuar</div>
+        
+        <!-- Holograma superior con la interfaz de audio -->
+        <div class="hologram hologram-top" id="hologram1">
+            <!-- Pantalla inicial: Subir archivo -->
+            <div id="uploadScreen" class="hologram-screen active">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <p>Arrastra tu archivo MP3 aquí</p>
+                    <p class="upload-subtitle">o haz clic para seleccionar</p>
+                    <input type="file" id="audioFile" accept=".mp3,.wav,.m4a" hidden>
+                </div>
+                <div class="upload-controls">
+                    <button id="selectFileBtn" class="btn-primary">Seleccionar Archivo</button>
+                    <button id="analyzeBtn" class="btn-secondary" disabled>Analizar Similitud</button>
+                </div>
+                <div id="selectedFile" class="selected-file" style="display: none;">
+                    <span class="file-icon">🎵</span>
+                    <span class="file-name"></span>
+                    <span class="file-size"></span>
+                </div>
+            </div>
+
+            <!-- Pantalla de carga -->
+            <div id="loadingScreen" class="hologram-screen">
+                <div class="loading-animation">
+                    <div class="waveform">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                    <h3>Analizando tu audio...</h3>
+                    <p class="loading-text">Extrayendo características musicales</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pantalla de resultados -->
+            <div id="resultsScreen" class="hologram-screen">
+                <div class="results-header">
+                    <p class="similarity-info">Encontradas <span id="matchCount">0</span> coincidencias</p>
+                    <button id="backBtn" class="btn-back">← Nueva Búsqueda</button>
+                </div>
+                <div class="results-container" id="resultsContainer">
+                    <!-- Los resultados se cargarán aquí dinámicamente -->
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Audio player global (oculto) -->
+    <audio id="globalAudioPlayer" preload="none"></audio>
+
+    <!-- Three.js ES6 Modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module" src="script.js"></script>
+    <script type="module" src="audio-handler.js"></script>
+</body>
+</html>

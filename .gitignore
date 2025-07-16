@@ -110,3 +110,9 @@ MANIFEST
 *.tar
 *.gz
 *.bz2
+
+./HeiderDB/test_audios
+
+/HeiderDB/test_audios
+
+test_audios
