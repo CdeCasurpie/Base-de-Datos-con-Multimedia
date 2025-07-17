@@ -48,10 +48,11 @@ class MultimediaIndex(IndexBase):
             src = src.decode("utf-8").rstrip("\x00")
 
         dst = self.storage.store(src)
-        vec = self.feature_extractor.extract(dst)
+        local_descriptors = self.feature_extractor.extract(dst)
 
-        if vec is not None:
-            self.vector_index.add_vector(key, vec)
+        if local_descriptors is not None and len(local_descriptors) > 0:
+            # Use add_vectors (not add_vector) and pass the list of local descriptors
+            self.vector_index.add_vectors(key, local_descriptors)
             self.vector_index.save()
             self.metadata[key] = dst
             self._save_metadata()
@@ -77,8 +78,8 @@ class MultimediaIndex(IndexBase):
             return
         for key, path in self.metadata.items():
             if os.path.exists(path):
-                vec = self.feature_extractor.extract(path)
-                self.vector_index.add_vector(key, vec)
+                local_descriptors = self.feature_extractor.extract(path)
+                self.vector_index.add_vectors(key, local_descriptors)
 
     def search(self, key):
         return self.metadata.get(key)

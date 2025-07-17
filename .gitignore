@@ -116,3 +116,9 @@ MANIFEST
 /HeiderDB/test_audios
 
 test_audios
+
+
+images_app/images
+images_app/static/images
+images_app/static/images/*
+images_app/temp_uploads

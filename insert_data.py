@@ -2,6 +2,7 @@
 """
 Script para insertar datos multimedia automáticamente.
 Crea tablas de imágenes y audios e inserta todos los archivos de las carpetas correspondientes.
+Usa images_dataset como dataset de entrenamiento para el vocabulario visual.
 """
 
 import os
@@ -59,18 +60,19 @@ def create_and_populate_tables():
     # Directorios de archivos multimedia
     images_dir = "./HeiderDB/test_images"
     audios_dir = "./HeiderDB/test_audios"
+    training_dataset_dir = "/home/cesar/Escritorio/Proyectos/Base-de-Datos-con-Multimedia/HeiderDB/images_dataset"
     
     # Extensiones permitidas
     image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']
     audio_extensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a']
     
-    print("🎵 Script de inserción de datos multimedia")
-    print("=" * 50)
+    print("🎵 Script de inserción de datos multimedia con entrenamiento automático")
+    print("=" * 70)
     
     # ================================
-    # TABLA DE IMÁGENES
+    # TABLA DE IMÁGENES CON ENTRENAMIENTO
     # ================================
-    print("\n📸 Procesando tabla de imágenes...")
+    print("\n📸 Procesando tabla de imágenes con entrenamiento...")
     
     # Crear tabla de imágenes (si no existe)
     create_images_query = """
@@ -81,19 +83,26 @@ def create_and_populate_tables():
     ) using index bplus_tree(id);
     """
 
-    create_index = """
-    CREATE MULTIMEDIA INDEX idx_image ON imagenes (archivo) WITH TYPE image METHOD sift;
+    # Crear índice multimedia CON entrenamiento automático
+    create_index = f"""
+    CREATE MULTIMEDIA INDEX idx_image ON imagenes (archivo) WITH TYPE image METHOD sift TRAIN FROM '/home/cesar/Escritorio/Proyectos/Base-de-Datos-con-Multimedia/HeiderDB/images_dataset';
     """
     
     try:
         response = client.send_query(create_images_query)
-        response2 = client.send_query(create_index)
         if response['status'] == 'ok':
             print("✅ Tabla 'imagenes' creada exitosamente")
         else:
             print(f"⚠️  Tabla 'imagenes': {response.get('message', 'Ya existe o error')}")
+            
+        print(f"🧠 Entrenando vocabulario visual desde: {training_dataset_dir}")
+        response2 = client.send_query(create_index)
+        if response2['status'] == 'ok':
+            print("✅ Índice multimedia creado y vocabulario visual entrenado exitosamente")
+        else:
+            print(f"❌ Error creando índice multimedia no uwu: {response2.get('message', 'Error desconocido')}")
     except Exception as e:
-        print(f"❌ Error creando tabla 'imagenes': {e}")
+        print(f"❌ Error creando tabla/índice 'imagenes': {e}")
     
     # Obtener archivos de imágenes
     image_files = get_files_from_directory(images_dir, image_extensions)
@@ -117,7 +126,7 @@ def create_and_populate_tables():
             print(f"  ❌ [{i:2d}] Excepción insertando {nombre}: {e}")
     
     # ================================
-    # TABLA DE AUDIOS
+    # TABLA DE AUDIOS (sin entrenamiento específico)
     # ================================
     print(f"\n🎵 Procesando tabla de audios...")
     
@@ -191,10 +200,16 @@ def create_and_populate_tables():
         print(f"❌ Excepción verificando tabla 'audios': {e}")
     
     print(f"\n🎉 ¡Proceso completado!")
-    print("=" * 50)
-    print("💡 Puedes verificar las tablas con:")
+    print("=" * 70)
+    print("💡 Características del sistema:")
+    print(f"   🧠 Vocabulario visual entrenado desde: {training_dataset_dir}")
+    print("   📸 Índice de imágenes: SIFT con TF-IDF y paginación eficiente")
+    print("   🎵 Índice de audios: MFCC con vectores locales")
+    print("\n💡 Puedes verificar las tablas con:")
     print("   python HeiderDB/client.py --query \"SELECT * FROM imagenes;\"")
     print("   python HeiderDB/client.py --query \"SELECT * FROM audios;\"")
+    print("\n💡 Búsquedas por similitud:")
+    print("   python HeiderDB/client.py --query \"SELECT * FROM imagenes WHERE archivo SIMILAR TO '/path/to/query.jpg' LIMIT 5;\"")
 
 
 if __name__ == "__main__":

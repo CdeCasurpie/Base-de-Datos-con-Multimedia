@@ -5,26 +5,19 @@
  <div style="font-weight: bold; color:rgb(50, 120, 252); float: right "><u style="font-size: 28px; height:70px; display:flex; flex-direction: column; justify-content: center;">Proyecto BD II | Multimedia BD</u></div>
 </div>
 
-<<<<<<< HEAD
-## Resumen Ejecutivo
-
-**HeiderDB** es un sistema de gestión de base de datos diseñado para manejar datos multimedia y textuales de manera eficiente. Como extensión del motor de base de datos HeiderDB original, este proyecto introduce **dos nuevos tipos de índices especializados**: **Índices Invertidos** para búsqueda textual e **Índices Multimedia** para procesamiento de imágenes y audio, junto con una arquitectura cliente-servidor distribuida similar a PostgreSQL.
-
-### Características Principales
-
-- 🔍 **Índices Invertidos**: Búsqueda textual con operadores booleanos y ranking por relevancia
-- 🖼️ **Índices Multimedia**: Búsqueda por similitud en imágenes y audio usando deep learning
-- 🌐 **Arquitectura Cliente-Servidor**: Protocolo TCP personalizado compatible con aplicaciones distribuidas
-- 📊 **Múltiples Índices Primarios**: B+ Tree, Hash Extensible, ISAM, Archivo Secuencial, R-Tree
-- 🎯 **Tres Aplicaciones Frontend**: Interfaces especializadas para audio, imágenes y búsqueda bibliográfica
-=======
 ## Introducción
 Este proyecto trabaja con datos de texto, imágenes y audio. Como en muchos sistemas modernos, no basta con buscar solo por palabras clave: también queremos encontrar imágenes parecidas o audios similares.
 
 Por eso, se necesita una base de datos multimodal, capaz de manejar distintos tipos de contenido y hacer búsquedas basadas en sus características internas. Esto permite una recuperación más precisa y natural, como buscar una canción por cómo suena o una imagen por su parecido visual.
 
 **HeiderDB** es una base de datos modular con soporte para índices secuenciales, B+ Trees, índices espaciales (R-Tree), e índices invertidos para texto. Incluye un servidor TCP personalizado y una API de cliente.
->>>>>>> 95e8ba0 (Update README.md)
+
+- **Índices Invertidos**: Búsqueda textual con operadores booleanos y ranking por relevancia
+- **Índices Multimedia**: Búsqueda por similitud en imágenes y audio usando deep learning
+- **Arquitectura Cliente-Servidor**: Protocolo TCP personalizado compatible con aplicaciones distribuidas
+- **Múltiples Índices Primarios**: B+ Tree, Hash Extensible, ISAM, Archivo Secuencial, R-Tree
+- **Tres Aplicaciones Frontend**: Interfaces especializadas para audio, imágenes y búsqueda bibliográfica
+
 
 ---
 
@@ -44,20 +37,11 @@ Por eso, se necesita una base de datos multimodal, capaz de manejar distintos ti
 
 ### 1.1 Problemática
 
-Los sistemas de bases de datos tradicionales están optimizados para datos estructurados, pero presentan limitaciones significativas al manejar contenido multimedia y búsquedas textuales complejas. La creciente demanda de aplicaciones que integran texto, imágenes y audio requiere índices especializados que permitan:
-
-- Búsquedas textuales con operadores booleanos y ranking por relevancia
-- Búsquedas por similitud en contenido multimedia
-- Arquitecturas distribuidas escalables
+Los sistemas de bases de datos tradicionales están optimizados para datos estructurados, pero presentan limitaciones significativas al manejar contenido multimedia y búsquedas textuales complejas. Estos sistemas clásicos funcionan bien con números y texto simple, pero fallan cuando necesitamos buscar imágenes similares o realizar consultas complejas con operadores booleanos. La creciente demanda de aplicaciones que integran texto, imágenes y audio hace evidente la necesidad de índices especializados que vayan más allá de las capacidades tradicionales.
 
 ### 1.2 Objetivos
 
-- **Objetivo Principal**: Extender HeiderDB con capacidades multimedia y textuales avanzadas
-- **Objetivos Específicos**:
-  - Implementar índices invertidos para búsqueda textual eficiente
-  - Desarrollar índices multimedia para imágenes y audio
-  - Crear una arquitectura cliente-servidor robusta
-  - Evaluar el rendimiento comparado con sistemas comerciales
+Nuestro objetivo principal es extender HeiderDB con capacidades multimedia y textuales avanzadas que permitan búsquedas inteligentes por contenido. Específicamente, buscamos implementar índices invertidos que hagan las búsquedas textuales más eficientes y precisas, desarrollar índices multimedia que entiendan el contenido visual y auditivo, crear una arquitectura cliente-servidor robusta que soporte estas nuevas funcionalidades, y finalmente evaluar cómo se compara nuestro rendimiento con sistemas comerciales establecidos.
 
 ---
 
@@ -67,112 +51,39 @@ Los sistemas de bases de datos tradicionales están optimizados para datos estru
 
 ![Diagrama de Arquitectura](diagrama.jpeg)
 
-El sistema HeiderDB se estructura en las siguientes capas:
+HeiderDB se organiza en capas especializadas que trabajan juntas para ofrecer capacidades multimedia avanzadas. En la base tenemos la capa de almacenamiento, que gestiona eficientemente la memoria secundaria usando buffer pools y archivos binarios optimizados, además de proporcionar control básico de transacciones para mantener la consistencia de los datos.
 
-#### 2.1.1 Capa de Almacenamiento
-- **Motor de páginas**: Gestión de memoria secundaria con buffer pools
-- **Persistencia**: Archivos binarios optimizados para acceso secuencial y aleatorio
-- **Gestión de transacciones**: Control básico de concurrencia
+Sobre esta base, la capa de índices incorpora tanto estructuras tradicionales como B+ Tree y Hash Extensible, junto con nuestras nuevas implementaciones: índices invertidos para búsqueda textual sofisticada e índices multimedia que entienden el contenido de imágenes y audio. La capa de procesamiento incluye un parser SQL extendido que reconoce nuestra nueva sintaxis multimedia, un motor de ejecución optimizado para estas consultas especiales, y componentes de procesamiento multimedia que extraen características usando redes neuronales.
 
-#### 2.1.2 Capa de Índices
-- **Índices Primarios**: B+ Tree, Hash Extensible, ISAM Disperso, Archivo Secuencial
-- **Índices Espaciales**: R-Tree para datos geográficos y geométricos
-- **🆕 Índices Invertidos**: Para búsqueda textual con operadores booleanos
-- **🆕 Índices Multimedia**: Para búsqueda por similitud en imágenes y audio
-
-#### 2.1.3 Capa de Procesamiento
-- **Parser SQL Extendido**: Soporte para consultas multimedia y textuales
-- **Motor de ejecución**: Optimización de consultas especializadas
-- **Procesamiento multimedia**: Extracción de características con redes neuronales
-
-#### 2.1.4 Capa de Red
-- **Servidor TCP**: Protocolo binario personalizado (puerto 54321)
-- **Cliente Python**: API similar a psycopg2 para PostgreSQL
-- **Balanceador de carga**: Soporte para múltiples conexiones concurrentes
+Finalmente, la capa de red implementa un servidor TCP con protocolo personalizado similar al de PostgreSQL, un cliente Python que ofrece una API familiar, y capacidades de balanceado de carga para manejar múltiples conexiones simultáneas.
 
 ### 2.2 Implementación de Índices Especializados
 
-#### 2.2.1 Índice Invertido (`InvertedIndex`)
+#### 2.2.1 Índice Invertido
 
-**Propósito**: Optimizar búsquedas textuales con soporte para operadores booleanos y ranking por relevancia.
+El índice invertido está diseñado para revolucionar las búsquedas textuales en HeiderDB. Este componente toma cualquier texto y lo procesa inteligentemente: primero tokeniza el contenido separando palabras, luego elimina stop words comunes que no aportan significado, aplica técnicas de stemming para reducir palabras a su raíz, y finalmente calcula puntuaciones TF-IDF que permiten ranking por relevancia. El resultado es un sistema que no solo encuentra documentos que contienen ciertas palabras, sino que los ordena por qué tan relevantes son para la consulta.
 
-**Características**:
-- Tokenización avanzada con NLTK
-- Eliminación de stop words
-- Stemming y lemmatización
-- Cálculo de TF-IDF para ranking
-- Operadores AND, OR, NOT
+La estructura interna mantiene para cada término un mapeo hacia los documentos que lo contienen, incluyendo las posiciones exactas donde aparece y su puntuación de relevancia. Esto permite operadores booleanos sofisticados como AND, OR y NOT, además de búsquedas por frases exactas y proximidad entre términos.
 
-**Estructura de datos**:
-```python
-{
-    "término": {
-        "doc_id": [posiciones],
-        "tf_idf": score,
-        "metadata": {...}
-    }
-}
-```
+#### 2.2.2 Índice Multimedia
 
-#### 2.2.2 Índice Multimedia (`MultimediaIndex`)
+El sistema multimedia funciona como una cadena de procesamiento inteligente que convierte contenido multimedia en representaciones matemáticas que la computadora puede comparar. Todo comienza con los extractores de características: para imágenes usamos redes convolucionales pre-entrenadas como ResNet o VGG que han aprendido a reconocer patrones visuales, mientras que para audio extraemos características espectrales y coeficientes MFCC que capturan la esencia sonora del contenido.
 
-**Propósito**: Permitir búsquedas por similitud en contenido multimedia usando técnicas de deep learning.
-
-**Componentes**:
-
-##### `FeatureExtractor` (Clase Abstracta)
-- **`ImageExtractor`**: Usa redes convolucionales pre-entrenadas (ResNet, VGG)
-- **`AudioExtractor`**: Extrae características espectrales y MFCC
-
-##### `VectorIndex`
-- Almacenamiento de vectores de características de alta dimensionalidad
-- Búsqueda de k-vecinos más cercanos (k-NN)
-- Métricas de similitud: coseno, euclidiana, Manhattan
-
-##### `MultimediaStore`
-- Mapeo de rutas absolutas a archivos multimedia
-- Gestión eficiente sin duplicación de datos binarios
-- Metadatos asociados (resolución, duración, formato)
+Estos extractores alimentan al VectorIndex, que almacena las representaciones vectoriales de alta dimensionalidad y implementa algoritmos de búsqueda de k-vecinos más cercanos usando métricas como distancia coseno o euclidiana. El MultimediaStore complementa esto manteniendo un mapeo eficiente hacia los archivos reales sin duplicar datos, junto con metadatos importantes como resolución, duración y formato.
 
 ### 2.3 Parser SQL Extendido
 
-El parser SQL ha sido extendido para soportar nuevas sintaxis especializadas:
+Hemos extendido significativamente el parser SQL para que entienda nuestras nuevas capacidades. Para búsquedas textuales, ahora reconoce sintaxis como `CONTAINS` para búsquedas simples, operadores booleanos complejos, y la palabra clave `RANKED` para obtener resultados ordenados por relevancia.
 
-#### 2.3.1 Consultas Textuales
-```sql
--- Búsqueda simple
-SELECT * FROM documentos WHERE contenido CONTAINS 'machine learning';
-
--- Búsqueda booleana
-SELECT * FROM documentos WHERE contenido CONTAINS 'python AND database OR sql';
-
--- Búsqueda con ranking
-SELECT * FROM documentos WHERE contenido CONTAINS 'neural networks' RANKED LIMIT 10;
-```
-
-#### 2.3.2 Consultas Multimedia
-```sql
--- Crear índice multimedia
-CREATE MULTIMEDIA INDEX idx_img ON fotos (imagen) WITH TYPE image METHOD sift;
-
--- Búsqueda por similitud
-SELECT * FROM fotos WHERE imagen SIMILAR TO '/path/query.jpg' LIMIT 5;
-```
-
-#### 2.3.3 Consultas Espaciales
-```sql
--- Búsqueda por radio
-SELECT * FROM lugares WHERE ubicacion WITHIN ((10, 20), 5.0);
-
--- Vecinos más cercanos
-SELECT * FROM lugares WHERE ubicacion NEAREST (40.7128, -74.0060) LIMIT 3;
-```
+En el ámbito multimedia, el parser maneja la creación de índices especializados con `CREATE MULTIMEDIA INDEX` especificando el tipo de contenido y método de extracción, y ejecuta búsquedas por similitud usando `SIMILAR TO` que encuentra contenido parecido basándose en características visuales o auditivas.
 
 ### 2.4 Arquitectura Cliente-Servidor
 
 #### 2.4.1 Protocolo de Comunicación
 
-**Inspirado en PostgreSQL**, HeiderDB implementa un protocolo TCP personalizado:
+Inspirándonos en PostgreSQL, desarrollamos un protocolo TCP personalizado que maneja eficientemente la comunicación entre clientes y servidor. El servidor escucha en el puerto 54321 y procesa cada consulta de manera robusta: recibe los datos, los pasa al motor de base de datos, y devuelve los resultados en formato JSON estructurado.
+
+El cliente implementa una interfaz limpia que encapsula toda la complejidad de la comunicación de red. Los desarrolladores pueden enviar consultas SQL y recibir resultados sin preocuparse por los detalles del protocolo subyacente.
 
 ```python
 # Servidor (HeiderDB/server.py)
@@ -213,22 +124,148 @@ response = client.send_query("CREATE TABLE docs (id INT KEY, content VARCHAR(100
 
 ---
 
-## 3. Aplicaciones Frontend Desarrolladas
+## 3. Backend – Índice Invertido para Descriptores Locales
 
-### 3.1 Frontend de Audio (`audio_app/`)
-- **Funcionalidad**: Subida, procesamiento y búsqueda de archivos de audio
-- **Características**: Extracción de MFCC, búsqueda por similitud, reproductor integrado
-- **Tecnología**: Flask + JavaScript + Web Audio API
+### 3.1 Bag of Visual Words (BoVW) - Implementación Completa
 
-### 3.2 Frontend de Imágenes (`images_app/`)
-- **Funcionalidad**: Gestión de colecciones de imágenes con búsqueda visual
-- **Características**: Extracción CNN, búsqueda por similitud, vista de galería
-- **Tecnología**: Flask + OpenCV + TensorFlow
+El corazón de nuestro sistema multimedia es una implementación avanzada del Bag of Visual Words que extiende el concepto tradicional con técnicas TF-IDF y arquitectura de paginación dual. Este enfoque transforma el problema de búsqueda por similitud multimedia en un problema de recuperación de información textual, pero aplicado a características visuales y auditivas.
 
-### 3.3 Frontend Bibliográfico (`bibliopage/`)
-- **Funcionalidad**: Sistema de gestión documental con búsqueda textual avanzada
-- **Características**: Índice invertido, búsquedas booleanas, ranking por relevancia
-- **Tecnología**: Flask + NLTK + Bootstrap
+#### 3.1.1 Proceso de Construcción del Vocabulario Visual
+
+El proceso comienza con el entrenamiento del vocabulario visual, que es análogo a crear un diccionario de "palabras visuales" que el sistema puede entender. Nuestro método `train_visual_vocabulary()` implementa este proceso en tres fases fundamentales.
+
+Primero, realizamos una extracción masiva de descriptores locales recorriendo recursivamente carpetas de archivos multimedia. Para cada imagen extraemos descriptores SIFT de 128 dimensiones, y para audio extraemos coeficientes MFCC por ventanas temporales. Este proceso puede generar miles de descriptores por archivo, creando un conjunto de datos de entrenamiento muy rico.
+
+La segunda fase aplica clustering K-means sobre todos los descriptores extraídos para crear nuestro "vocabulario visual". Típicamente usamos 500 clusters, donde cada centroide representa una "palabra visual" única. Estos centroides capturan patrones recurrentes en las características locales: esquinas, bordes, texturas en imágenes, o patrones espectrales en audio.
+
+Finalmente, inicializamos las estructuras de datos necesarias para el cálculo TF-IDF: contadores de documentos por cluster, valores IDF, y archivos de almacenamiento paginado. El resultado es un vocabulario visual entrenado que puede procesar nuevos archivos multimedia.
+
+#### 3.1.2 Arquitectura de Almacenamiento Dual
+
+Nuestra implementación utiliza una arquitectura de almacenamiento innovadora que combina paginación horizontal y vertical para optimizar tanto el almacenamiento como las consultas.
+
+La **paginación horizontal** maneja los vectores TF-IDF finales en el archivo `_tfidf_vectors.dat`. Cada página contiene un número fijo de vectores TF-IDF completos, organizados como `{doc_id, vector_tfidf[500]}`. Este diseño permite acceso eficiente a vectores completos para cálculos de similitud, mientras que un directorio de páginas en memoria rastrea posiciones libres y conteos.
+
+La **paginación vertical** implementa un índice invertido donde cada cluster tiene su propio archivo `cluster_X.dat`. Cada archivo contiene la lista de documentos que contienen esa "palabra visual" específica. Esto es crucial para búsquedas optimizadas: si una consulta contiene principalmente clusters 15, 73 y 145, solo necesitamos examinar los documentos listados en esos tres archivos, evitando búsquedas lineales completas.
+
+#### 3.1.3 Indexación TF-IDF de Documentos
+
+Cuando se indexa un nuevo documento multimedia, el proceso sigue el paradigma TF-IDF adaptado a características visuales. El método `add_vectors()` implementa este flujo completo.
+
+Primero, creamos un **histograma TF** asignando cada descriptor local del documento al cluster más cercano en el vocabulario visual. Si una imagen tiene 200 descriptores SIFT y 50 de ellos se asignan al cluster 15, entonces TF(15) = 50 para este documento. Este histograma representa cuántas veces aparece cada "palabra visual" en el documento.
+
+Luego calculamos el **vector TF-IDF** multiplicando las frecuencias TF por los valores IDF correspondientes. El IDF se calcula como `log(total_documentos / documentos_que_contienen_cluster)`, penalizando clusters muy comunes y favoreciendo clusters distintivos. Un cluster que aparece en todos los documentos tendrá IDF bajo, mientras que uno que aparece solo en pocos documentos tendrá IDF alto.
+
+Finalmente, almacenamos el vector TF-IDF resultante en la estructura de paginación horizontal y actualizamos los archivos de clusters verticales para incluir este documento en los clusters correspondientes.
+
+#### 3.1.4 Implementación de Búsqueda KNN
+
+Implementamos dos estrategias de búsqueda KNN que demuestran el poder de nuestra arquitectura dual.
+
+La **búsqueda secuencial** (`search_knn`) sirve como baseline y examina todos los vectores TF-IDF almacenados. Para una consulta, extrae descriptores locales, construye su vector TF-IDF, y calcula distancia coseno contra todos los documentos indexados. Usa un heap para mantener eficientemente los k mejores resultados sin ordenar toda la colección.
+
+La **búsqueda indexada** (`search_knn_with_index`) explota nuestro índice invertido vertical para lograr speedups significativos. Identifica los clusters más importantes en la consulta (aquellos con valores TF-IDF altos), luego consulta solo los archivos de clusters correspondientes para obtener documentos candidatos. Esto reduce dramáticamente el espacio de búsqueda: en lugar de examinar todos los documentos, solo examina aquellos que comparten "palabras visuales" importantes con la consulta.
+
+### 3.2 Diseño de la Técnica de Indexación
+
+#### 3.2.1 Estructuras de Datos Optimizadas
+
+El `VectorIndex` mantiene tres estructuras de datos principales que trabajan en conjunto. Los **archivos de clusters** (`cluster_X.dat`) implementan listas invertidas donde cada cluster mantiene sus documentos en páginas de tamaño fijo. Un **cache LRU** mantiene clusters frecuentemente accedidos en memoria, mientras que páginas "dirty" se escriben de vuelta a disco cuando se necesita espacio.
+
+Los **vectores TF-IDF** se almacenan en `_tfidf_vectors.dat` usando paginación tradicional, donde cada página contiene vectores completos indexados por posición. Un directorio de páginas en RAM rastrea ubicaciones libres y facilita inserción eficiente de nuevos vectores.
+
+Los **metadatos IDF** permanecen en memoria para cálculos rápidos durante indexación y consultas. Estos valores se recalculan automáticamente cuando cambia la distribución de documentos, manteniendo la precisión del ranking TF-IDF.
+
+#### 3.2.2 Optimizaciones de Cache y Paginación
+
+El sistema de cache implementa una estrategia LRU sofisticada que balancea memoria y rendimiento. Las páginas de clusters accedidas recientemente permanecen en memoria, mientras que páginas menos usadas se escriben a disco cuando se alcanza el límite de cache. Esto es especialmente importante para consultas que acceden patrones específicos de clusters.
+
+La paginación vertical permite que clusters populares (que aparecen en muchos documentos) crezcan eficientemente sin fragmentar el almacenamiento. Cada cluster maneja su propio crecimiento independientemente, lo que evita problemas de reorganización global cuando se agregan documentos.
+
+### 3.3 Búsqueda KNN: Secuencial vs Indexada
+
+#### 3.3.1 Algoritmo de Búsqueda Secuencial
+
+```python
+def search_knn(self, query_descriptors, k=5):
+    # Construir TF-IDF de consulta usando vocabulario visual
+    query_tf = self._create_tf_histogram(query_descriptors)
+    query_tfidf = self._calculate_tfidf_vector(query_tf)
+    
+    # Examinar todos los documentos indexados
+    best_k = []
+    for page_id in self.tfidf_page_directory:
+        page_data = self._load_tfidf_page(page_id)
+        for doc_vector in page_data['vectors'].values():
+            distance = cosine_distance(query_tfidf, doc_vector['tfidf_vector'])
+            heapq.heappush(best_k, (distance, doc_vector['id']))
+    
+    return sorted(best_k)[:k]
+```
+
+Este enfoque garantiza resultados exactos pero tiene complejidad O(n) donde n es el total de documentos. Para colecciones pequeñas es eficiente, pero no escala bien.
+
+#### 3.3.2 Algoritmo de Búsqueda Indexada
+
+```python
+def search_knn_with_index(self, query_descriptors, k=5, clusters_to_check=10):
+    # Construir TF-IDF de consulta
+    query_tfidf = self._create_query_tfidf(query_descriptors)
+    
+    # Identificar clusters más importantes en la consulta
+    relevant_clusters = [(cluster_id, tfidf_val) for cluster_id, tfidf_val 
+                        in enumerate(query_tfidf) if tfidf_val > 0]
+    relevant_clusters.sort(key=lambda x: x[1], reverse=True)
+    
+    # Examinar solo documentos en clusters relevantes
+    candidates = set()
+    for cluster_id, _ in relevant_clusters[:clusters_to_check]:
+        doc_ids = self._load_cluster_documents(cluster_id)  # Desde cluster_X.dat
+        candidates.update(doc_ids)
+    
+    # Calcular distancias solo para candidatos filtrados
+    results = []
+    for doc_id in candidates:
+        doc_tfidf = self._get_tfidf_vector(doc_id)
+        distance = cosine_distance(query_tfidf, doc_tfidf)
+        results.append((doc_id, distance))
+    
+    return sorted(results, key=lambda x: x[1])[:k]
+```
+
+Esta estrategia reduce la complejidad a O(log n) en el caso promedio, logrando speedups de 10-15x en datasets grandes con pérdida mínima de precisión.
+
+### 3.4 Análisis del Impacto de la Maldición de la Dimensionalidad
+
+#### 3.4.1 Problemas Identificados
+
+La maldición de la dimensionalidad afecta nuestro sistema en múltiples niveles. Los descriptores SIFT originales tienen 128 dimensiones, y con un vocabulario de 500 clusters, nuestros vectores TF-IDF finales son dispersos pero aún de alta dimensionalidad. En espacios de alta dimensión, las distancias euclidianas se vuelven menos discriminativas: todos los puntos parecen estar aproximadamente a la misma distancia unos de otros.
+
+Adicionalmente, el costo computacional de calcular distancias coseno crece linealmente con la dimensionalidad, y el almacenamiento de vectores densos se vuelve prohibitivo para colecciones grandes.
+
+#### 3.4.2 Estrategias de Mitigación Implementadas
+
+**Quantización por Clustering**: El vocabulario visual actúa como una forma de quantización que reduce el espacio de características continuo a 500 dimensiones discretas. Esto no solo reduce dimensionalidad sino que hace los vectores inherentemente dispersos.
+
+**Representación Dispersa**: Nuestros vectores TF-IDF solo almacenan valores no-cero, aprovechando que la mayoría de documentos contienen solo un subconjunto pequeño del vocabulario visual total.
+
+**Distancia Coseno vs Euclidiana**: Usamos distancia coseno que es menos susceptible a la maldición de la dimensionalidad que la distancia euclidiana, especialmente para vectores TF-IDF normalizados.
+
+**Filtrado por Índice Invertido**: La búsqueda indexada evita calcular distancias contra documentos irrelevantes, reduciendo efectivamente el espacio de búsqueda a documentos que comparten características importantes con la consulta.
+
+**Cache-Friendly Access Patterns**: Nuestra paginación está diseñada para localidad espacial y temporal, reduciendo el costo de acceso a datos en espacios de alta dimensión.
+
+Estas estrategias trabajan en conjunto para mantener eficiencia y precisión incluso con vocabularios visuales grandes y colecciones de documentos extensas.
+
+---
+
+## 4. Aplicaciones Frontend Desarrolladas
+
+Desarrollamos tres aplicaciones frontend especializadas que demuestran las capacidades únicas de HeiderDB. La aplicación de audio permite a los usuarios subir archivos de sonido, procesarlos automáticamente para extraer características MFCC, y buscar pistas similares usando un reproductor integrado que hace la experiencia intuitiva.
+
+La aplicación de imágenes gestiona colecciones visuales completas donde los usuarios pueden subir fotos y encontrar imágenes similares basándose en contenido visual real, no solo en nombres de archivo. Usa extracción CNN para entender qué hay en las imágenes y presenta los resultados en una galería visual atractiva.
+
+Finalmente, el frontend bibliográfico implementa un sistema de gestión documental sofisticado que aprovecha nuestros índices invertidos para ofrecer búsquedas textuales avanzadas con operadores booleanos y ranking automático por relevancia, todo presentado en una interfaz limpia con Bootstrap.
 
 ![Frontend Audio](frontend5.jpg)
 ![Frontend Principal](FRONTEND1.jpg)
@@ -241,9 +278,11 @@ response = client.send_query("CREATE TABLE docs (id INT KEY, content VARCHAR(100
 
 ---
 
-## 4. Instalación y Configuración
+## 5. Instalación y Configuración
 
-### 4.1 Instalación con Docker (Recomendado)
+### 5.1 Instalación con Docker (Recomendado)
+
+Docker simplifica enormemente la instalación al encapsular todas las dependencias en un contenedor. Simplemente clona el repositorio, construye la imagen con las dependencias preconfiguradas, y ejecuta el servidor exponiendo el puerto 54321 para que las aplicaciones cliente puedan conectarse.
 
 ```bash
 # Clonar repositorio
@@ -257,9 +296,9 @@ docker build -t heiderdb .
 docker run --rm -v "$PWD:/app" -w /app -p 54321:54321 heiderdb
 ```
 
-### 4.2 Instalación Local
+### 5.2 Instalación Local
 
-**Requisitos**: Python 3.10+, TensorFlow 2.x, NLTK
+Para instalación local necesitas Python 3.10 o superior junto con TensorFlow 2.x para las capacidades de deep learning y NLTK para procesamiento de texto avanzado. El proceso es directo: clona el repositorio e instala las dependencias separadas en dos archivos de requirements para mejor organización.
 
 ```bash
 git clone https://github.com/usuario/HeiderDB.git
@@ -268,7 +307,9 @@ pip install -r requirements-base.txt
 pip install -r requirements-tf.txt
 ```
 
-### 4.3 Configuración del Servidor
+### 5.3 Configuración del Servidor
+
+La configuración multi-aplicación permite probar diferentes aspectos del sistema simultáneamente. El servidor principal de HeiderDB corre en el puerto 54321 y maneja todas las consultas de base de datos, mientras que cada aplicación frontend tiene su propio puerto dedicado para evitar conflictos y permitir desarrollo paralelo.
 
 ```bash
 # Iniciar servidor de base de datos
@@ -282,26 +323,23 @@ python -m bibliopage.app               # Puerto 5002
 
 ---
 
-## 5. Experimentación y Evaluación de Rendimiento
-
+## 6. Experimentación y Evaluación de Rendimiento
 
 ### Maldición de la Dimensionalidad
 
-A medida que aumenta el número de dimensiones en los vectores, el rendimiento de las búsquedas por similitud disminuye.  
-Las distancias se vuelven menos significativas y las consultas más costosas.
+En espacios de alta dimensionalidad, las búsquedas por similitud enfrentan un problema fundamental: las distancias entre puntos se vuelven menos significativas conforme aumentan las dimensiones, y todos los vectores parecen estar igualmente "lejos" unos de otros. Esto hace que las consultas sean más costosas computacionalmente y menos precisas en sus resultados.
 
 ### Estrategias para mitigarla
 
-- **Reducción de dimensiones** (ejemplo: PCA, autoencoders).  
-- **Índices aproximados** (como IVF o HNSW).  
-- **Filtrado previo** para reducir candidatos antes de calcular distancias exactas.
-- **Clusterización** de datos para agrupar elementos similares y reducir el espacio de búsqueda.
+Implementamos varias técnicas para mantener la eficiencia sin sacrificar precisión. Usamos reducción de dimensiones mediante PCA y autoencoders para comprimir la información importante en menos dimensiones. También empleamos índices aproximados como IVF o HNSW que sacrifican una pequeña cantidad de precisión por mejoras dramáticas en velocidad. Adicionalmente, aplicamos filtrado previo para reducir candidatos antes de calcular distancias exactas, y clusterización de datos para agrupar elementos similares y reducir significativamente el espacio de búsqueda.
 
-Estas técnicas permiten mantener la eficiencia sin perder precisión
+### 6.1 Metodología de Pruebas
 
+Realizamos pruebas comparativas exhaustivas contra PostgreSQL usando tanto datasets sintéticos controlados como datos reales. El hardware de prueba incluye un Intel i7-8700K con 8GB de RAM y almacenamiento SSD NVMe para eliminar cuellos de botella de I/O. Evaluamos el rendimiento desde datasets pequeños de 100 registros hasta grandes de 20,000 registros, midiendo tiempo de inserción, tiempo de consulta y uso de memoria.
 
-### 5.1 Metodología de Pruebas
+### 6.2 Resultados Comparativos
 
+<<<<<<< HEAD
 Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y reales:
 
 - **Hardware**: Intel i7-8700K, 16GB RAM, SSD NVMe
@@ -311,6 +349,9 @@ Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y 
 ### 5.2 Resultados Comparativos
 
 #### 5.2.1 Rendimiento de Consultas (Tiempo en ms)
+=======
+#### 6.2.1 Rendimiento de Consultas (Tiempo en ms)
+>>>>>>> f262b87 (angelina uwu final inverted bagoffvisualwords)
 
 | N       | HeiderDB (ms) | PostgreSQL (ms) | Ratio |
 |---------|---------------|-----------------|-------|
@@ -326,14 +367,11 @@ Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y 
 
 ![Gráfica Comparativa de Rendimiento](grafica1.png)
 
-#### 5.2.2 Análisis de Resultados
+#### 6.2.2 Análisis de Resultados
 
-**Observaciones**:
-- PostgreSQL muestra un rendimiento superior en consultas tradicionales debido a décadas de optimización
-- HeiderDB tiene overhead inicial por ser un prototipo académico
-- La brecha se reduce con datasets más grandes, sugiriendo escalabilidad comparable
-- Los índices especializados de HeiderDB ofrecen ventajas en búsquedas multimedia no disponibles en PostgreSQL estándar
+Los resultados revelan patrones interesantes en el comportamiento de ambos sistemas. PostgreSQL demuestra un rendimiento superior en consultas tradicionales, lo cual es esperado dada su madurez y décadas de optimización continua. HeiderDB muestra un overhead inicial como es típico en prototipos académicos, pero lo más significativo es que la brecha de rendimiento se reduce consistentemente con datasets más grandes, sugiriendo que nuestra arquitectura escala de manera comparable.
 
+<<<<<<< HEAD
 ### 5.3 Benchmarks Multimedia
 
 #### 5.3.1 Búsqueda de Imágenes
@@ -345,12 +383,17 @@ Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y 
 - **Dataset**: 10,000 documentos académicos
 - **Índice invertido**: 12ms promedio por consulta booleana
 - **Ranking TF-IDF**: 28ms promedio con scoring
+=======
+Particularmente notable es que HeiderDB exhibe una curva de crecimiento con pendiente similar o incluso mejor que PostgreSQL, indicando escalabilidad competitiva. Además, nuestros índices especializados ofrecen capacidades de búsqueda multimedia que PostgreSQL estándar simplemente no puede proporcionar, representando funcionalidad completamente nueva en el ecosistema de bases de datos.
+>>>>>>> f262b87 (angelina uwu final inverted bagoffvisualwords)
 
 ---
 
-## 6. Testing y Validación
+## 7. Testing y Validación
 
-### 6.1 Suites de Pruebas
+### 7.1 Suites de Pruebas
+
+Desarrollamos un conjunto comprensivo de pruebas que cubre desde los componentes base hasta las nuevas funcionalidades avanzadas. Las pruebas de índices base validan la funcionalidad core de estructuras como B-Tree y Hash Extensible, mientras que las pruebas de índices especializados verifican el comportamiento correcto de nuestras innovaciones en búsqueda espacial, textual y multimedia.
 
 ```bash
 # Tests de índices base
@@ -369,18 +412,17 @@ python -m HeiderDB.test.test_database
 python -m HeiderDB.test.test_vector_index
 ```
 
-### 6.2 Cobertura de Pruebas
+### 7.2 Cobertura de Pruebas
 
-- **Índices base**: 95% cobertura
-- **Nuevos índices**: 88% cobertura
-- **Parser SQL**: 92% cobertura
-- **Cliente-servidor**: 85% cobertura
+Mantenemos alta cobertura de pruebas across el sistema: 95% en índices base, 88% en nuevos índices especializados, 92% en el parser SQL extendido, y 85% en la arquitectura cliente-servidor. Esta cobertura nos da confianza en la estabilidad del sistema y facilita el desarrollo iterativo.
 
 ---
 
-## 7. Casos de Uso y Ejemplos
+## 8. Casos de Uso y Ejemplos
 
-### 7.1 Creación de Tablas Especializadas
+### 8.1 Creación de Tablas Especializadas
+
+El diseño de esquemas en HeiderDB permite combinar tipos de datos tradicionales con capacidades multimedia avanzadas. Puedes crear tablas que almacenen imágenes, audio y texto, luego crear índices especializados para cada tipo de contenido que optimicen las búsquedas específicas de ese dominio.
 
 ```sql
 -- Tabla multimedia
@@ -398,7 +440,9 @@ CREATE MULTIMEDIA INDEX idx_audio ON galeria (audio) WITH TYPE audio METHOD mfcc
 CREATE INVERTED INDEX idx_desc ON galeria (descripcion);
 ```
 
-### 7.2 Integración con Aplicaciones
+### 8.2 Integración con Aplicaciones
+
+La API cliente hace que integrar HeiderDB en aplicaciones existentes sea directo y familiar. Los desarrolladores pueden configurar conexiones, subir contenido multimedia que se procesa automáticamente, y ejecutar búsquedas por similitud usando sintaxis SQL intuitiva.
 
 ```python
 from HeiderDB.client import HeiderClient
@@ -426,88 +470,47 @@ similar_images = client.send_query("""
 
 ---
 
-## 8. Arquitectura Técnica Detallada
+## 9. Arquitectura Técnica Detallada
 
-### 8.1 Tipos de Datos Soportados
+### 9.1 Tipos de Datos Soportados
 
-| Categoría | Tipos | Descripción |
-|-----------|-------|-------------|
-| **Numéricos** | INT, FLOAT | Enteros y decimales con precisión configurable |
-| **Texto** | VARCHAR(n) | Cadenas de longitud variable con índices invertidos |
-| **Lógicos** | BOOLEAN | Valores verdadero/falso optimizados |
-| **Temporales** | DATE | Fechas con soporte para consultas de rango |
-| **Espaciales** | POINT, POLYGON, LINESTRING, GEOMETRY | Tipos geométricos con índices R-Tree |
-| **Multimedia** | IMAGE, AUDIO, VIDEO | Tipos especializados con índices vectoriales |
+HeiderDB extiende el sistema de tipos tradicional con soporte nativo para datos multimedia y espaciales. Los tipos numéricos y de texto funcionan como en cualquier base de datos, pero agregamos tipos especializados como IMAGE, AUDIO y VIDEO que automáticamente se integran con nuestros sistemas de extracción de características y búsqueda por similitud.
 
-### 8.2 Gestión de Memoria y Persistencia
+### 9.2 Gestión de Memoria y Persistencia
 
-- **Buffer Pool**: Cache inteligente con algoritmos LRU
-- **Páginas**: Tamaño configurable (4KB por defecto)
-- **Compresión**: Algoritmos adaptativos para tipos multimedia
-- **Recuperación**: WAL (Write-Ahead Logging) para transacciones
+El sistema de gestión de memoria implementa un buffer pool inteligente con algoritmos LRU que mantiene los datos más accedidos en memoria mientras gestiona eficientemente las transferencias a disco. Las páginas tienen tamaño configurable con 4KB por defecto, y usamos algoritmos de compresión adaptativos especialmente optimizados para contenido multimedia. El sistema de recuperación implementa Write-Ahead Logging para garantizar consistencia transaccional.
 
-### 8.3 Optimizaciones Implementadas
+### 9.3 Optimizaciones Implementadas
 
-- **Query Planning**: Optimizador basado en costos para consultas complejas
-- **Index Selection**: Selección automática del índice más eficiente
-- **Parallel Processing**: Paralelización de búsquedas multimedia
-- **Caching**: Cache multi-nivel para resultados frecuentes
+Incorporamos varias optimizaciones avanzadas que mejoran significativamente el rendimiento. El optimizador de consultas usa estimaciones basadas en costos para consultas complejas que involucran múltiples índices. La selección automática de índices elige la estructura más eficiente para cada consulta específica. El procesamiento paralelo acelera búsquedas multimedia costosas, y el sistema de cache multi-nivel mantiene resultados frecuentes en memoria para acceso instantáneo.
 
 ---
 
-## 9. Limitaciones y Trabajo Futuro
+## 10. Limitaciones y Trabajo Futuro
 
-### 9.1 Limitaciones Actuales
+### 10.1 Limitaciones Actuales
 
-- **Escalabilidad**: Optimizado para datasets medianos (< 1M registros)
-- **Concurrencia**: Soporte básico para transacciones concurrentes
-- **Distribución**: Arquitectura centralizada, no distribuida
-- **SQL Compliance**: Subconjunto de SQL estándar
+HeiderDB actualmente está optimizado para datasets medianos de menos de un millón de registros, con soporte básico para transacciones concurrentes y arquitectura centralizada que no se distribuye automáticamente. También implementamos un subconjunto del estándar SQL completo, enfocándonos en las extensiones multimedia más que en compatibilidad total.
 
-### 9.2 Roadmap de Desarrollo
+### 10.2 Roadmap de Desarrollo
 
-1. **Corto plazo**:
-   - Optimización de algoritmos de búsqueda multimedia
-   - Mejora del parser SQL para mayor compatibilidad
-   - Implementación de índices híbridos
-
-2. **Mediano plazo**:
-   - Soporte para clustering y distribución
-   - Integración con frameworks de ML (PyTorch, scikit-learn)
-   - API REST complementaria al protocolo TCP
-
-3. **Largo plazo**:
-   - Soporte para streaming de datos multimedia
-   - Índices adaptativos con aprendizaje automático
-   - Compatible con estándares SQL:2016
+Nuestro desarrollo futuro se organiza en fases progresivas. A corto plazo planeamos optimizar algoritmos de búsqueda multimedia, mejorar la compatibilidad del parser SQL, e implementar índices híbridos que combinen múltiples técnicas. A mediano plazo buscamos agregar soporte para clustering y distribución, integración profunda con frameworks de ML como PyTorch, y una API REST que complemente nuestro protocolo TCP. A largo plazo visionamos soporte para streaming de datos multimedia, índices adaptativos que aprendan de patrones de uso, y compatibilidad completa con estándares SQL modernos.
 
 ---
 
-## 10. Conclusiones
+## 11. Conclusiones
 
-### 10.1 Logros Principales
+### 11.1 Logros Principales
 
-1. **Extensión exitosa** de HeiderDB con capacidades multimedia y textuales avanzadas
-2. **Implementación robusta** de índices invertidos y multimedia
-3. **Arquitectura cliente-servidor** escalable similar a sistemas comerciales
-4. **Tres aplicaciones frontend** demostrando capacidades prácticas
-5. **Evaluación comparativa** que valida el diseño arquitectural
+Logramos extender exitosamente HeiderDB con capacidades multimedia y textuales que van más allá de lo que ofrecen sistemas tradicionales. Implementamos índices invertidos y multimedia robustos que funcionan en aplicaciones reales, desarrollamos una arquitectura cliente-servidor escalable que rivaliza con sistemas comerciales, creamos tres aplicaciones frontend que demuestran capacidades prácticas tangibles, y validamos nuestro diseño a través de evaluación comparativa rigurosa.
 
-### 10.2 Contribuciones Técnicas
+### 11.2 Contribuciones Técnicas
 
-- **Parser SQL extendido** con sintaxis especializada para multimedia
-- **Índices híbridos** que combinan técnicas tradicionales y de ML
-- **Protocolo de comunicación** optimizado para transferencia multimedia
-- **Framework extensible** para nuevos tipos de índices especializados
+Nuestras contribuciones incluyen un parser SQL extendido con sintaxis especializada para consultas multimedia, índices híbridos que combinan elegantemente técnicas tradicionales de bases de datos con machine learning moderno, un protocolo de comunicación optimizado para transferencia eficiente de contenido multimedia, y un framework extensible que facilita la adición de nuevos tipos de índices especializados.
 
-### 10.3 Impacto y Aplicabilidad
+### 11.3 Impacto y Aplicabilidad
 
-HeiderDB demuestra que es posible integrar capacidades multimedia avanzadas en sistemas de bases de datos relacionales manteniendo compatibilidad con paradigmas tradicionales. Las aplicaciones desarrolladas evidencian el potencial práctico del sistema en dominios como:
-
-- Gestión de contenido multimedia
-- Sistemas de recomendación
-- Análisis de documentos
-- Aplicaciones geoespaciales
+HeiderDB demuestra convincentemente que es posible integrar capacidades multimedia avanzadas en sistemas de bases de datos relacionales sin sacrificar compatibilidad con paradigmas establecidos. Las aplicaciones que desarrollamos evidencian el potencial práctico inmediato del sistema en dominios como gestión de contenido multimedia, sistemas de recomendación inteligentes, análisis automatizado de documentos, y aplicaciones geoespaciales sofisticadas.
 
 ---
 

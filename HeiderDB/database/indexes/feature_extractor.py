@@ -5,7 +5,7 @@ import os
 class FeatureExtractor(ABC):
     """
     Clase base abstracta para extractores de características multimedia.
-    Define la interfaz para extraer vectores de diferentes tipos de medios.
+    Define la interfaz para extraer vectores locales de diferentes tipos de medios.
     """
 
     def __init__(self):
@@ -14,23 +14,23 @@ class FeatureExtractor(ABC):
     @abstractmethod
     def extract(self, file_path):
         """
-        Extrae vector de características del archivo multimedia
+        Extrae lista de vectores de características locales del archivo multimedia
 
         Params:
             file_path: Ruta al archivo multimedia
 
         Returns:
-            numpy.ndarray: Vector de características
+            list[numpy.ndarray]: Lista de vectores de características locales
         """
         pass
 
     @abstractmethod
     def get_vector_dimension(self):
         """
-        Retorna la dimensión del vector de características
+        Retorna la dimensión de cada vector de características local
 
         Returns:
-            int: Dimensión del vector
+            int: Dimensión de cada vector local
         """
         pass
 
@@ -38,7 +38,7 @@ class FeatureExtractor(ABC):
 class ImageExtractor(FeatureExtractor):
     """
     Extractor de características para imágenes.
-    Implementa métodos SIFT o CNN para caracterización.
+    Implementa métodos SIFT o CNN para extraer vectores locales.
     """
 
     def __init__(self, method="sift"):
@@ -47,7 +47,7 @@ class ImageExtractor(FeatureExtractor):
             raise ValueError("Método no soportado. Elija 'sift' o 'cnn'.")
 
         self.method = method
-        self.media_type = "image"  # Agregar atributo media_type
+        self.media_type = "image"
         self.cnn_model = None
         self.sift_detector = None
 
@@ -59,41 +59,42 @@ class ImageExtractor(FeatureExtractor):
             except ImportError:
                 print("Warning: OpenCV not available, using dummy SIFT")
                 self.sift_detector = None
-            self._dimension = 512  # 128 * 4 estadísticas
+            self._dimension = 128  # Dimensión original de SIFT
 
         elif self.method == "cnn":
             try:
                 from tensorflow.keras.applications.inception_v3 import InceptionV3
 
+                # Usar modelo sin pooling global para extraer mapas de características
                 self.cnn_model = InceptionV3(
                     include_top=False, weights="imagenet", pooling=None
                 )
             except ImportError:
                 print("Warning: TensorFlow not available, using dummy CNN")
                 self.cnn_model = None
-            self._dimension = 2048
+            self._dimension = 128  # Dimensión reducida para vectores locales CNN
 
     def extract(self, file_path):
         if self.method == "sift":
-            return self._extract_sift(file_path)
+            return self._extract_sift_local(file_path)
         elif self.method == "cnn":
-            return self._extract_cnn(file_path)
+            return self._extract_cnn_local(file_path)
         else:
             import numpy as np
-
-            return np.array([0.0] * self._dimension, dtype=np.float32)
+            # Retornar lista de vectores dummy
+            return [np.array([0.0] * self._dimension, dtype=np.float32) for _ in range(10)]
 
     def get_vector_dimension(self):
         return self._dimension
 
-    def _extract_sift(self, image_path):
+    def _extract_sift_local(self, image_path):
         """
-        Extrae características SIFT y las agrega en un vector único de dimensión fija.
+        Extrae características SIFT locales como lista de descriptores.
         """
         if self.sift_detector is None:
             import numpy as np
-
-            return np.array([0.1] * 512, dtype=np.float32)
+            # Retornar vectores dummy
+            return [np.array([0.1] * 128, dtype=np.float32) for _ in range(10)]
 
         try:
             import cv2
@@ -102,104 +103,168 @@ class ImageExtractor(FeatureExtractor):
             img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if img is None:
                 print(f"⚠ No se pudo cargar la imagen: {image_path}")
-                return np.array([0.0] * 512, dtype=np.float32)
+                return [np.array([0.0] * 128, dtype=np.float32)]
 
             _, descriptors = self.sift_detector.detectAndCompute(img, None)
 
             if descriptors is None or len(descriptors) == 0:
                 print(f"⚠ No se encontraron características SIFT en {image_path}")
-                return np.array([0.0] * 512, dtype=np.float32)
+                return [np.array([0.0] * 128, dtype=np.float32)]
 
-            # Calcular estadísticas agregadas de todos los descriptores
-            features_aggregated = np.concatenate(
-                [
-                    np.mean(descriptors, axis=0),  # 128 dimensiones - promedio
-                    np.std(
-                        descriptors, axis=0
-                    ),  # 128 dimensiones - desviación estándar
-                    np.min(descriptors, axis=0),  # 128 dimensiones - mínimo
-                    np.max(descriptors, axis=0),  # 128 dimensiones - máximo
-                ]
-            )
-
-            # Resultado: vector de 512 dimensiones (128 * 4 estadísticas)
-            return features_aggregated.astype(np.float32)
+            # Retornar lista de descriptores locales (cada uno de 128 dimensiones)
+            return [desc.astype(np.float32) for desc in descriptors]
 
         except Exception as e:
             print(f"Error extrayendo SIFT de {image_path}: {e}")
             import numpy as np
+            return [np.array([0.0] * 128, dtype=np.float32)]
 
-            return np.array([0.0] * 512, dtype=np.float32)
-
-    def _extract_cnn(self, image_path):
+    def _extract_cnn_local(self, image_path):
+        """
+        Extrae características CNN locales dividiendo la imagen en patches.
+        """
         if self.cnn_model is None:
             import numpy as np
-
-            return np.array([0.1] * 2048, dtype=np.float32)
+            return [np.array([0.1] * 128, dtype=np.float32) for _ in range(16)]
 
         try:
             import numpy as np
             from tensorflow.keras.preprocessing import image
             from tensorflow.keras.applications.inception_v3 import preprocess_input
+            from sklearn.decomposition import PCA
 
+            # Cargar y preparar imagen
             img = image.load_img(image_path, target_size=(299, 299))
             img_array = image.img_to_array(img)
             img_batch = np.expand_dims(img_array, axis=0)
             preprocessed_img = preprocess_input(img_batch)
-            features = self.cnn_model.predict(preprocessed_img, verbose=0)
-            features = features[0].flatten()  # Aplanar a vector 1D
-            return features.astype(np.float32)
+            
+            # Extraer mapa de características
+            feature_map = self.cnn_model.predict(preprocessed_img, verbose=0)
+            # feature_map shape: (1, H, W, 2048) donde H,W dependen de la arquitectura
+            
+            # Aplanar el mapa espacial para obtener vectores locales
+            feature_map = feature_map[0]  # Remover batch dimension
+            h, w, channels = feature_map.shape
+            
+            # Reshape para obtener vectores locales
+            local_vectors = feature_map.reshape(h * w, channels)
+            
+            # Reducir dimensionalidad a 128 usando PCA si es necesario
+            if channels > 128:
+                try:
+                    pca = PCA(n_components=128)
+                    local_vectors = pca.fit_transform(local_vectors)
+                except:
+                    # Si PCA falla, tomar las primeras 128 dimensiones
+                    local_vectors = local_vectors[:, :128]
+            
+            # Retornar lista de vectores locales
+            return [vec.astype(np.float32) for vec in local_vectors]
+            
         except Exception as e:
-            print(f"Error in CNN extraction: {e}")
+            print(f"Error in CNN local extraction: {e}")
             import numpy as np
-
-            return np.array([0.1] * 2048, dtype=np.float32)
+            return [np.array([0.1] * 128, dtype=np.float32) for _ in range(16)]
 
 
 class AudioExtractor(FeatureExtractor):
     """
     Extractor de características para audio.
-    Implementa métodos MFCC para caracterización con una dimensión fija de 20.
+    Implementa métodos MFCC para extraer vectores locales por ventanas temporales.
     """
 
     def __init__(self, method="mfcc"):
         super().__init__()
-        self._dimension = 20
-        self.media_type = "audio"  # Agregar atributo media_type
-        self.method = method  # Agregar atributo method
+        self._dimension = 128  # Dimensión de cada vector MFCC local
+        self.media_type = "audio"
+        self.method = method
 
     def extract(self, file_path):
-        return self._extract_mfcc(file_path)
+        if self.method == "mfcc":
+            return self._extract_mfcc_local(file_path)
+        else:
+            return self._extract_spectral_local(file_path)
 
     def get_vector_dimension(self):
         return self._dimension
 
-    def _extract_mfcc(self, audio_path):
+    def _extract_mfcc_local(self, audio_path):
+        """
+        Extrae características MFCC locales por ventanas temporales.
+        REtorna: list[numpy.ndarray] de vectores MFCC locales 
+        """
         try:
             import librosa
             import numpy as np
 
             y, sr = librosa.load(audio_path, sr=None)
-            mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=self._dimension)
+            
+            # Extraer MFCCs con más frames para tener más vectores locales
+            mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=self._dimension, 
+                                       hop_length=512, n_fft=2048)
 
-            # Calcular promedio a lo largo del tiempo para obtener vector fijo
             if mfccs.size > 0:
-                mfcc_mean = np.mean(mfccs, axis=1)  # Promedio temporal
-                return mfcc_mean.astype(np.float32)
+                # Transponer para tener (time_frames, n_mfcc)
+                mfcc_frames = mfccs.T
+                
+                # Retornar lista de vectores MFCC locales (uno por frame temporal)
+                return [frame.astype(np.float32) for frame in mfcc_frames]
             else:
-                return np.array([0.0] * self._dimension, dtype=np.float32)
+                return [np.array([0.0] * self._dimension, dtype=np.float32)]
 
         except ImportError:
             print("Warning: librosa not available, using dummy MFCC")
             import numpy as np
-
-            return np.array([0.1] * self._dimension, dtype=np.float32)  # Vector fijo
+            return [np.array([0.1] * self._dimension, dtype=np.float32) for _ in range(10)]
 
         except Exception as e:
             print(f"Error procesando el archivo de audio {audio_path}: {e}")
             import numpy as np
+            return [np.array([0.0] * self._dimension, dtype=np.float32)]
 
-            return np.array([0.0] * self._dimension, dtype=np.float32)
+    def _extract_spectral_local(self, audio_path):
+        """
+        Extrae características espectrales locales por ventanas temporales.
+        """
+        try:
+            import librosa
+            import numpy as np
+
+            y, sr = librosa.load(audio_path, sr=None)
+            
+            # Extraer diferentes características espectrales
+            hop_length = 512
+            
+            # Spectral centroid, bandwidth, rolloff
+            spectral_centroids = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop_length)[0]
+            spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr, hop_length=hop_length)[0]
+            spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=hop_length)[0]
+            
+            # Zero crossing rate
+            zcr = librosa.feature.zero_crossing_rate(y, hop_length=hop_length)[0]
+            
+            # Combinar características para cada frame
+            features_per_frame = []
+            min_length = min(len(spectral_centroids), len(spectral_bandwidth), 
+                           len(spectral_rolloff), len(zcr))
+            
+            for i in range(min_length):
+                # Crear vector de características espectrales (extender a 20 dimensiones)
+                frame_features = np.array([
+                    spectral_centroids[i], spectral_bandwidth[i], spectral_rolloff[i], zcr[i]
+                ])
+                
+                # Extender a 20 dimensiones con repetición controlada
+                extended_features = np.tile(frame_features, 5)[:self._dimension]
+                features_per_frame.append(extended_features.astype(np.float32))
+            
+            return features_per_frame if features_per_frame else [np.array([0.0] * self._dimension, dtype=np.float32)]
+
+        except Exception as e:
+            print(f"Error en extracción espectral de {audio_path}: {e}")
+            import numpy as np
+            return [np.array([0.0] * self._dimension, dtype=np.float32)]
 
 
 def create_feature_extractor(media_type, method="sift"):
@@ -208,7 +273,7 @@ def create_feature_extractor(media_type, method="sift"):
 
     Args:
         media_type (str): Type of media ("image" or "audio")
-        method (str): Method for extraction ("sift"/"cnn" for images, "mfcc" for audio)
+        method (str): Method for extraction ("sift"/"cnn" for images, "mfcc"/"spectral" for audio)
 
     Returns:
         FeatureExtractor: Appropriate feature extractor instance
@@ -217,72 +282,7 @@ def create_feature_extractor(media_type, method="sift"):
         return ImageExtractor(method=method)
     elif media_type == "audio":
         # Para audio, usar method si se especifica, sino usar "mfcc" por defecto
-        audio_method = method if method in ["mfcc"] else "mfcc"
+        audio_method = method if method in ["mfcc", "spectral"] else "mfcc"
         return AudioExtractor(method=audio_method)
     else:
         raise ValueError(f"Unsupported media type: {media_type}")
-
-
-if __name__ == "__main__":
-    import sys
-
-    image_path = "test_image.jpeg"
-    audio_path = "test_audio.mp3"
-
-    print("--- Verificando archivos de prueba ---")
-
-    if not os.path.exists(image_path):
-        print(f"ERROR: No se encontró el archivo '{image_path}'.")
-        print(
-            "Por favor, coloca una imagen con ese nombre en la misma carpeta que el script y vuelve a ejecutarlo."
-        )
-        sys.exit()
-
-    if not os.path.exists(audio_path):
-        print(f"ERROR: No se encontró el archivo '{audio_path}'.")
-        print(
-            "Por favor, coloca un archivo de audio con ese nombre en la misma carpeta y vuelve a ejecutarlo."
-        )
-        sys.exit()
-
-    print(
-        f"Archivos '{image_path}' y '{audio_path}' encontrados. Iniciando pruebas...\n"
-    )
-
-    print("--- Probando ImageExtractor (SIFT) ---")
-    sift_extractor = create_feature_extractor("image", "sift")
-    print(f"Dimensión de vector SIFT: {sift_extractor.get_vector_dimension()}")
-    sift_features = sift_extractor.extract(image_path)
-    print(
-        f"Forma de descriptores SIFT: {sift_features.shape if hasattr(sift_features, 'shape') and sift_features is not None else 'Ninguno'}\n"
-    )
-
-    print("--- Probando ImageExtractor (CNN) ---")
-    cnn_extractor = create_feature_extractor("image", "cnn")
-    print(f"Dimensión de vector CNN: {cnn_extractor.get_vector_dimension()}")
-    cnn_features = cnn_extractor.extract(image_path)
-    print(
-        f"Forma de vector CNN global: {cnn_features.shape if hasattr(cnn_features, 'shape') else len(cnn_features)}\n"
-    )
-
-    print("--- Probando AudioExtractor (MFCC) ---")
-    audio_extractor = create_feature_extractor("audio")
-    print(f"Dimensión de cada vector MFCC: {audio_extractor.get_vector_dimension()}")
-
-    mfcc_features = audio_extractor.extract(audio_path)
-    print(
-        f"Forma de vectores locales MFCC: {mfcc_features.shape if hasattr(mfcc_features, 'shape') else len(mfcc_features)}"
-    )
-
-    if hasattr(mfcc_features, "size") and mfcc_features.size > 0:
-        try:
-            import numpy as np
-
-            global_mfcc = np.mean(mfcc_features, axis=1)
-            print(f"Forma del vector MFCC global (promediado): {global_mfcc.shape}\n")
-        except:
-            print("No se pudo calcular el vector global\n")
-    else:
-        print("\n")
-
-    print("--- Pruebas completadas ---")

@@ -426,6 +426,8 @@ class Database:
 
             query_type = parsed.get("type", "").upper()
 
+            print(query_type)
+
             # CREATE TABLE
             if query_type == "CREATE_TABLE":
                 success, message = self.create_table(
@@ -531,6 +533,7 @@ class Database:
                 column_name = parsed["column_name"]
                 media_type = parsed["media_type"]
                 method = parsed["method"]
+                train_folder = parsed.get("train_folder")  # Nuevo: folder de entrenamiento
 
                 if table_name not in self.tables:
                     return None, f"Tabla '{table_name}' no encontrada"
@@ -571,6 +574,36 @@ class Database:
                     # Inicializar el índice multimedia
                     multimedia_index.initialize(media_type=media_type, method=method)
 
+
+                    print("holi")
+                    # NUEVO: Entrenar vocabulario visual si se proporcionó folder
+                    if train_folder:
+                        import os 
+                        if not os.path.exists(train_folder):
+                            return None, f"Folder de entrenamiento no encontrado: {train_folder}"
+                        
+                        print(f"Entrenando vocabulario visual desde: {train_folder}")
+                        
+                        # Verificar que el índice multimedia tiene vector_index
+                        if not hasattr(multimedia_index, 'vector_index') or multimedia_index.vector_index is None:
+                            return None, "Error: índice vectorial no inicializado correctamente"
+                        
+                        # Verificar que tiene feature_extractor
+                        if not hasattr(multimedia_index, 'feature_extractor') or multimedia_index.feature_extractor is None:
+                            return None, "Error: extractor de características no inicializado"
+                        
+                        try:
+                            # Entrenar el vocabulario visual
+                            multimedia_index.vector_index.train_visual_vocabulary(
+                                folder_path=train_folder,
+                                feature_extractor=multimedia_index.feature_extractor
+                            )
+                            print(f"✓ Vocabulario visual entrenado exitosamente con {multimedia_index.vector_index.num_clusters} clusters")
+                        except Exception as e:
+                            return None, f"Error entrenando vocabulario visual: {e}"
+
+
+                    print("oli 2")
                     # Indexar registros existentes en la tabla
                     records = table.get_all()
 
@@ -582,21 +615,21 @@ class Database:
                                 key = record[primary_key_column]
                                 image_path = record[column_name]
                                 if isinstance(image_path, bytes):
-                                    image_path = image_path.decode("utf-8").rstrip(
-                                        "\x00"
-                                    )
+                                    image_path = image_path.decode("utf-8").rstrip("\x00")
 
                                 try:
                                     multimedia_index.add(record, key)
                                 except Exception as e:
-                                    print(f"Error indexando registro {key}: {e}")
+                                    print(f"⚠ Error indexando registro {key}: {e}")
 
-                    return (
-                        f"Índice multimedia creado exitosamente para '{column_name}' con método '{method}'",
-                        None,
-                    )
+                    success_msg = f"Índice multimedia creado exitosamente para '{column_name}' con método '{method}'"
+                    if train_folder:
+                        success_msg += f" y vocabulario entrenado desde '{train_folder}'"
+                    
+                    return success_msg, None
+                    
                 except Exception as e:
-                    return None, f"Error creando índice multimedia: {e}"
+                    return None, f"Error creando índice multimedia no uwu: {e}"
 
             # SELECT
             elif query_type == "SELECT":
@@ -1690,7 +1723,7 @@ class Database:
 
             return True, f"Índice multimedia creado para la columna '{column_name}'"
         except Exception as e:
-            return False, f"Error creando índice multimedia: {e}"
+            return False, f"Error creando índice multimedia uwu: {e}"
 
     def get_multimedia_index_stats(self, table_name, column_name):
         """

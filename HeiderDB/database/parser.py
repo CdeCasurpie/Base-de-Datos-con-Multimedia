@@ -364,11 +364,12 @@ def parse_query(query):
     
 def parse_create_multimedia_index(query):
     """
-    Parsea CREATE MULTIMEDIA INDEX idx_name ON table (column) WITH TYPE media_type [METHOD method]
+    Parsea CREATE MULTIMEDIA INDEX idx_name ON table (column) WITH TYPE media_type [METHOD method] [TRAIN FROM 'folder_path']
     """
+    # Patrón extendido para incluir TRAIN FROM
     multimedia_index_pattern = r"""
         CREATE\s+MULTIMEDIA\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(\s*(\w+)\s*\)\s+
-        WITH\s+TYPE\s+(\w+)(?:\s+METHOD\s+(\w+))?
+        WITH\s+TYPE\s+(\w+)(?:\s+METHOD\s+(\w+))?(?:\s+TRAIN\s+FROM\s+['"](.*?)['"])?
         \s*;?$
     """
 
@@ -383,6 +384,7 @@ def parse_create_multimedia_index(query):
             "method": (
                 match.group(5).lower() if match.group(5) else "sift"
             ),  # Default method
+            "train_folder": match.group(6) if match.group(6) else None,  # Folder de entrenamiento
             "error_message": None,
         }
     return None
