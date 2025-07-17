@@ -257,7 +257,356 @@ Adicionalmente, el costo computacional de calcular distancias coseno crece linea
 
 Estas estrategias trabajan en conjunto para mantener eficiencia y precisión incluso con vocabularios visuales grandes y colecciones de documentos extensas.
 
+### 3.5 Construcción del Índice Invertido en Memoria Secundaria
+
+#### 3.5.1 Arquitectura de Archivos y Paginación
+
+La construcción del índice invertido en HeiderDB implementa una estrategia de almacenamiento en memoria secundaria que optimiza tanto el espacio como la velocidad de acceso. El sistema utiliza **tres archivos especializados** que trabajan en conjunto:
+
+```python
+# Estructura de archivos del índice invertido
+self.dictionary_file = f"{table_name}_{column_name}_inverted_dictionary.dat"
+self.postings_file = f"{table_name}_{column_name}_inverted_postings.dat"
+self.metadata_file = f"{table_name}_{column_name}_inverted_metadata.json"
+```
+
+#### Archivo de Diccionario (`dictionary.dat`)
+El diccionario se almacena en formato binario compacto usando la siguiente estructura:
+
+```
+[Header: 4 bytes] - Número total de términos
+[Término 1]
+  ├── [4 bytes] - Longitud del término
+  ├── [N bytes] - Término UTF-8
+  ├── [8 bytes] - Offset en postings.dat
+  ├── [4 bytes] - Tamaño de la posting list
+  └── [4 bytes] - Document Frequency (DF)
+[Término 2]
+  └── ... (misma estructura)
+```
+
+Esta estructura permite **acceso directo O(1)** a cualquier término manteniendo el diccionario completo en memoria para búsquedas rápidas.
+
+#### Archivo de Posting Lists (`postings.dat`)
+Las posting lists se almacenan usando serialización pickle para preservar estructuras complejas:
+
+```python
+posting_list_structure = {
+    'term': 'palabra_clave',
+    'df': 15,  # Document frequency
+    'postings': [
+        {
+            'doc_id': 101,
+            'tf': 3,  # Term frequency
+            'positions': [12, 45, 78]  # Posiciones en el documento
+        },
+        {
+            'doc_id': 205,
+            'tf': 7,
+            'positions': [5, 23, 34, 56, 67, 89, 112]
+        }
+    ]
+}
+```
+
+#### 3.5.2 Algoritmo SPIMI Adaptado
+
+Implementamos una versión adaptada del algoritmo **Single-Pass In-Memory Indexing (SPIMI)** que maneja eficientemente la construcción incremental:
+
+```python
+def add(self, record, key):
+    """Algoritmo SPIMI para construcción incremental del índice"""
+    
+    # 1. Procesamiento de texto y extracción de términos
+    text = record[self.column_name]
+    terms = self.text_processor.process_text(text)
+    
+    # 2. Calcular frecuencias y posiciones
+    term_freqs = {}
+    term_positions = {}
+    
+    for pos, term in enumerate(terms):
+        if term in term_freqs:
+            term_freqs[term] += 1
+            term_positions[term].append(pos)
+        else:
+            term_freqs[term] = 1
+            term_positions[term] = [pos]
+    
+    # 3. Actualizar posting lists en memoria secundaria
+    for term, tf in term_freqs.items():
+        self._update_posting_list(term, key, tf, term_positions[term])
+    
+    # 4. Persistir cambios
+    self._save_dictionary()
+    self._save_metadata()
+```
+
+### 3.5.3 Estrategia de Escritura Append-Only
+
+El sistema utiliza una estrategia **append-only** para las posting lists que prioriza la consistencia sobre la eficiencia de espacio:
+
+```python
+def _write_posting_list(self, posting_list):
+    """Escribe posting list al final del archivo"""
+    serialized = pickle.dumps(posting_list)
+    
+    with open(self.postings_file, 'ab') as f:  # Append mode
+        offset = f.tell()  # Posición actual (final del archivo)
+        f.write(serialized)
+        size = len(serialized)
+    
+    return offset, size
+```
+
+**Ventajas del approach append-only:**
+- ✅ **Atomicidad**: Las escrituras son atómicas por diseño
+- ✅ **Simplicidad**: No requiere gestión compleja de espacio libre
+- ✅ **Consistencia**: Evita corrupción en caso de fallos del sistema
+
+**Limitaciones identificadas:**
+- ❌ **Fragmentación**: Actualizaciones crean entradas duplicadas
+- ❌ **Crecimiento**: El archivo crece indefinidamente sin compactación
+- ❌ **Eficiencia**: Desperdicia espacio cuando se actualizan términos frecuentes
+
 ---
+
+### 3.6 Ejecución Eficiente de Consultas Utilizando Similitud de Coseno
+
+#### 3.6.1 Fundamentos de la Similitud de Coseno en Recuperación de Información
+
+La similitud de coseno es fundamental en nuestro sistema de ranking porque **mide la orientación entre vectores**, no su magnitud. Esto es crucial para documentos de diferentes longitudes:
+
+```
+similitud_coseno(A, B) = (A · B) / (||A|| × ||B||)
+
+Donde:
+- A · B = producto punto de los vectores TF-IDF
+- ||A|| = magnitud euclidiana del vector A
+- ||B|| = magnitud euclidiana del vector B
+```
+
+#### 3.6.2 Implementación de TF-IDF Vectorial
+
+Nuestro sistema construye vectores TF-IDF donde cada dimensión representa un término del vocabulario:
+
+```python
+def compute_tf_idf(self, term, document):
+    """Calcula TF-IDF para un término en un documento específico"""
+    
+    # Obtener posting list del término
+    posting_list = self._read_posting_list(term)
+    if not posting_list:
+        return 0.0
+    
+    # Buscar documento en la posting list
+    doc_posting = None
+    for posting in posting_list['postings']:
+        if posting['doc_id'] == document:
+            doc_posting = posting
+            break
+    
+    if not doc_posting:
+        return 0.0
+    
+    # Calcular componentes TF-IDF
+    tf = doc_posting['tf']  # Frecuencia del término
+    df = posting_list['df']  # Document frequency
+    idf = math.log(self.doc_count / df)  # Inverse document frequency
+    
+    return tf * idf
+```
+
+#### 3.6.3 Algoritmo de Búsqueda Rankeada
+
+La búsqueda rankeada implementa el modelo vectorial completo con optimizaciones para términos sparse:
+
+```python
+def search_ranked(self, query, k=10):
+    """Búsqueda rankeada usando similitud de coseno"""
+    
+    # 1. Procesamiento de la consulta
+    query_terms = self.text_processor.process_text(query)
+    if not query_terms:
+        return []
+    
+    # 2. Construcción del vector de consulta
+    query_vector = {}
+    for term in set(query_terms):
+        if term in self.dictionary:
+            # TF de la consulta (frecuencia del término en la query)
+            tf_query = query_terms.count(term)
+            
+            # IDF del término en la colección
+            df = self.dictionary[term]['df']
+            idf = math.log(self.doc_count / df)
+            
+            query_vector[term] = tf_query * idf
+    
+    # 3. Identificación de documentos candidatos
+    candidate_docs = set()
+    for term in query_vector.keys():
+        posting_list = self._read_posting_list(term)
+        if posting_list:
+            doc_ids = [p['doc_id'] for p in posting_list['postings']]
+            candidate_docs.update(doc_ids)
+    
+    # 4. Cálculo de similitudes
+    doc_scores = {}
+    for doc_id in candidate_docs:
+        score = self._calculate_cosine_similarity(query_vector, doc_id)
+        if score > 0:  # Solo documentos con similitud positiva
+            doc_scores[doc_id] = score
+    
+    # 5. Ranking y selección top-k
+    sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+    top_k_docs = sorted_docs[:k]
+    
+    # 6. Recuperación de documentos completos
+    results = []
+    for doc_id, score in top_k_docs:
+        doc = self.table_ref.search(self.table_ref.primary_key, doc_id)
+        if doc:
+            doc['_score'] = score  # Añadir puntuación para debugging
+            results.append(doc)
+    
+    return results
+```
+
+#### 3.6.4 Optimización de Similitud de Coseno para Vectores Sparse
+
+La implementación optimizada aprovecha que los vectores TF-IDF son típicamente sparse (la mayoría de valores son cero):
+
+```python
+def _calculate_cosine_similarity(self, query_vector, doc_id):
+    """Similitud de coseno optimizada para vectores sparse"""
+    
+    # 1. Construir vector del documento solo para términos de la consulta
+    doc_vector = {}
+    for term in query_vector.keys():
+        tfidf_value = self.compute_tf_idf(term, doc_id)
+        if tfidf_value > 0:
+            doc_vector[term] = tfidf_value
+    
+    # 2. Producto punto (solo términos comunes)
+    dot_product = 0.0
+    for term in query_vector.keys():
+        if term in doc_vector:
+            dot_product += query_vector[term] * doc_vector[term]
+    
+    # 3. Calcular magnitudes
+    query_magnitude = math.sqrt(sum(val**2 for val in query_vector.values()))
+    doc_magnitude = math.sqrt(sum(val**2 for val in doc_vector.values()))
+    
+    # 4. Evitar división por cero
+    if query_magnitude == 0 or doc_magnitude == 0:
+        return 0.0
+    
+    return dot_product / (query_magnitude * doc_magnitude)
+```
+
+#### 3.6.5 Complejidad Computacional y Optimizaciones
+
+**Análisis de complejidad:**
+- **Construcción de query vector**: O(|Q|) donde Q son términos únicos en la consulta
+- **Identificación de candidatos**: O(|Q| × avg_posting_length)
+- **Cálculo de similitudes**: O(|C| × |Q|) donde C son documentos candidatos
+- **Sorting final**: O(|C| × log |C|)
+
+**Optimizaciones implementadas:**
+
+1. **Early termination**: Solo calcular similitud para documentos que comparten términos con la consulta
+2. **Sparse vectors**: No almacenar ni procesar valores cero
+3. **Term-at-a-time processing**: Procesar un término a la vez para mejor localidad de memoria
+4. **Threshold filtering**: Filtrar documentos con similitud menor a un umbral mínimo
+
+---
+
+### 3.7 Mecanismo de Construcción de Índices Invertidos en PostgreSQL
+
+#### 3.7.1 Arquitectura de Índices de Texto Completo en PostgreSQL
+
+PostgreSQL implementa búsqueda de texto completo a través de su sistema **tsvector/tsquery** que es fundamentalmente diferente a nuestro approach:
+
+#### Tipos de Datos Especializados
+```sql
+-- Tipo tsvector: representación interna de documentos procesados
+CREATE TABLE documentos (
+    id SERIAL PRIMARY KEY,
+    titulo TEXT,
+    contenido TEXT,
+    contenido_idx tsvector GENERATED ALWAYS AS (to_tsvector('spanish', contenido)) STORED
+);
+
+-- Tipo tsquery: representación de consultas procesadas
+SELECT * FROM documentos WHERE contenido_idx @@ to_tsquery('spanish', 'postgresql & database');
+```
+
+#### 3.7.3 Comparación de Estrategias de Almacenamiento
+
+#### PostgreSQL GIN: Integración Total
+**Ventajas:**
+- ✅ **Integración ACID**: Transacciones completas y rollback automático
+- ✅ **Concurrencia**: Múltiples readers/writers con locks granulares
+- ✅ **Compresión**: Posting lists comprimidas automáticamente
+- ✅ **Vacuum**: Limpieza automática de espacio no utilizado
+
+**Arquitectura de páginas:**
+```
+GIN Page Structure:
+[Page Header | Special Space | Item Pointers | Items]
+├─ Entry Items: términos del vocabulario
+├─ Posting Items: listas de TIDs comprimidas
+└─ Special Space: metadatos GIN específicos
+```
+
+#### HeiderDB: Archivos Especializados
+**Ventajas:**
+- ✅ **Simplicidad**: Lógica de almacenamiento directa y comprensible
+- ✅ **Flexibilidad**: Fácil modificación de formatos de serialización
+- ✅ **Debugging**: Archivos inspeccionables independientemente
+- ✅ **Portabilidad**: Índices transportables entre sistemas
+
+**Limitaciones:**
+- ❌ **Consistencia**: Sin garantías ACID automáticas
+- ❌ **Concurrencia**: Locks de archivo nivel OS únicamente
+- ❌ **Fragmentación**: Estrategia append-only ineficiente
+
+#### 3.7.4 Algoritmos de Consulta: GIN vs HeiderDB
+
+#### Consulta GIN en PostgreSQL
+```sql
+-- Query: términos que deben aparecer todos (AND implícito)
+EXPLAIN (ANALYZE, BUFFERS) 
+SELECT id, titulo FROM documentos 
+WHERE contenido_idx @@ to_tsquery('spanish', 'postgresql & database & performance');
+```
+
+**Proceso interno:**
+1. **Parse tsquery**: Convertir consulta a árbol de operadores
+2. **Entry lookup**: Buscar cada término en el entry tree (B-tree)
+3. **Posting intersection**: Intersección eficiente de posting lists
+4. **TID to tuple**: Convertir TIDs a tuplas reales
+5. **Result assembly**: Ensamblar resultado final
+
+#### Consulta HeiderDB
+```python
+# Query equivalente en HeiderDB
+results = index.search_boolean("postgresql AND database AND performance")
+```
+
+**Proceso interno:**
+1. **Text processing**: Stemming y normalización
+2. **Dictionary lookup**: Búsqueda en diccionario en memoria
+3. **Posting retrieval**: Seek + read desde archivos especializados
+4. **Set operations**: Intersección usando estructuras Python
+5. **Document retrieval**: Consulta a tabla principal por primary key
+
+
+---
+
+
+
 
 ## 4. Aplicaciones Frontend Desarrolladas
 
@@ -327,31 +676,34 @@ python -m bibliopage.app               # Puerto 5002
 
 ### Maldición de la Dimensionalidad
 
-En espacios de alta dimensionalidad, las búsquedas por similitud enfrentan un problema fundamental: las distancias entre puntos se vuelven menos significativas conforme aumentan las dimensiones, y todos los vectores parecen estar igualmente "lejos" unos de otros. Esto hace que las consultas sean más costosas computacionalmente y menos precisas en sus resultados.
+A medida que aumenta el número de dimensiones en los vectores, el rendimiento de las búsquedas por similitud disminuye. Las distancias se vuelven menos significativas y las consultas más costosas.
 
 ### Estrategias para mitigarla
 
-Implementamos varias técnicas para mantener la eficiencia sin sacrificar precisión. Usamos reducción de dimensiones mediante PCA y autoencoders para comprimir la información importante en menos dimensiones. También empleamos índices aproximados como IVF o HNSW que sacrifican una pequeña cantidad de precisión por mejoras dramáticas en velocidad. Adicionalmente, aplicamos filtrado previo para reducir candidatos antes de calcular distancias exactas, y clusterización de datos para agrupar elementos similares y reducir significativamente el espacio de búsqueda.
+- **Reducción de dimensiones** (PCA, autoencoders)
+- **Índices aproximados** (IVF, HNSW) 
+- **Filtrado previo** para reducir candidatos antes de calcular distancias exactas
+- **Clusterización** de datos para agrupar elementos similares y reducir el espacio de búsqueda
+
+Estas técnicas permiten mantener la eficiencia sin perder mucha precisión.
 
 ### 6.1 Metodología de Pruebas
 
-Realizamos pruebas comparativas exhaustivas contra PostgreSQL usando tanto datasets sintéticos controlados como datos reales. El hardware de prueba incluye un Intel i7-8700K con 8GB de RAM y almacenamiento SSD NVMe para eliminar cuellos de botella de I/O. Evaluamos el rendimiento desde datasets pequeños de 100 registros hasta grandes de 20,000 registros, midiendo tiempo de inserción, tiempo de consulta y uso de memoria.
+**Hardware**: Intel i7-8700K, 8GB RAM, SSD NVMe  
+**Datasets**: 100 a 20,000 registros para texto; 100 a 3,200 imágenes para multimedia  
+**Configuración multimedia**: Descriptores SIFT, vocabulario visual de 500 clusters, K=8 para KNN  
+
+Se compararon tres enfoques: búsqueda secuencial, nuestro índice invertido, y PostgreSQL con pgVector.
 
 ### 6.2 Resultados Comparativos
 
-<<<<<<< HEAD
 Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y reales:
 
 - **Hardware**: Intel i7-8700K, 16GB RAM, SSD NVMe
 - **Datasets**: 100 a 20,000 registros
 - **Métricas**: Tiempo de inserción, tiempo de consulta, uso de memoria
 
-### 5.2 Resultados Comparativos
-
-#### 5.2.1 Rendimiento de Consultas (Tiempo en ms)
-=======
 #### 6.2.1 Rendimiento de Consultas (Tiempo en ms)
->>>>>>> f262b87 (angelina uwu final inverted bagoffvisualwords)
 
 | N       | HeiderDB (ms) | PostgreSQL (ms) | Ratio |
 |---------|---------------|-----------------|-------|
@@ -367,10 +719,18 @@ Se realizaron pruebas comparativas con PostgreSQL usando datasets sintéticos y 
 
 ![Gráfica Comparativa de Rendimiento](grafica1.png)
 
-#### 6.2.2 Análisis de Resultados
+#### 6.2.2 Índices Multimedia (KNN)
 
-Los resultados revelan patrones interesantes en el comportamiento de ambos sistemas. PostgreSQL demuestra un rendimiento superior en consultas tradicionales, lo cual es esperado dada su madurez y décadas de optimización continua. HeiderDB muestra un overhead inicial como es típico en prototipos académicos, pero lo más significativo es que la brecha de rendimiento se reduce consistentemente con datasets más grandes, sugiriendo que nuestra arquitectura escala de manera comparable.
+| N Imágenes | KNN-Secuencial | KNN-Indexado | PostgreSQL pgVector | Mejora |
+|------------|----------------|--------------|---------------------|--------|
+| 100        | 94 ms          | 26 ms        | 2.2 ms              | 3.6x   |
+| 200        | 203 ms         | 44 ms        | 1.6 ms              | 4.6x   |
+| 400        | 389 ms         | 84 ms        | 1.5 ms              | 4.6x   |
+| 800        | 612 ms         | 127 ms       | 4.8 ms              | 4.8x   |
+| 1600       | 1387 ms        | 283 ms       | 4.1 ms              | 4.9x   |
+| 3200       | 2234 ms        | 431 ms       | 24.2 ms             | 5.2x   |
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 ### 5.3 Benchmarks Multimedia
 
@@ -386,8 +746,24 @@ Los resultados revelan patrones interesantes en el comportamiento de ambos siste
 =======
 Particularmente notable es que HeiderDB exhibe una curva de crecimiento con pendiente similar o incluso mejor que PostgreSQL, indicando escalabilidad competitiva. Además, nuestros índices especializados ofrecen capacidades de búsqueda multimedia que PostgreSQL estándar simplemente no puede proporcionar, representando funcionalidad completamente nueva en el ecosistema de bases de datos.
 >>>>>>> f262b87 (angelina uwu final inverted bagoffvisualwords)
+=======
+>>>>>>> 6383d8b (sin condicion)
 
----
+![rendimiento multimedia](image.png)
+
+### 6.3 Análisis de Resultados
+
+#### 6.3.1 Texto
+PostgreSQL es más eficiente en consultas tradicionales por décadas de optimización. Pero HeiderDB muestra escalabilidad comparable - la pendiente de crecimiento es similar, sugiriendo que el overhead inicial se amortiza con datasets grandes.
+
+#### 6.3.2 Multimedia 
+**Nuestro índice invertido funciona**: Mejoras consistentes de 3.6x a 5.2x sobre búsqueda secuencial. La mejora aumenta con el tamaño del dataset, validando que el filtrado por clusters es efectivo.
+
+**PostgreSQL sigue siendo más rápido** pero también muestra degradación con datasets grandes (salta de 4ms a 24ms en 3,200 imágenes).
+
+**TF-IDF añade overhead** computacional pero mejora la calidad de resultados. La similitud coseno captura mejor las relaciones semánticas que distancia euclidiana simple.
+
+El sistema cumple su objetivo: búsquedas multimedia funcionais con rendimiento aceptable usando técnicas académicamente sólidas.
 
 ## 7. Testing y Validación
 
