@@ -73,6 +73,12 @@ class BPlusTree(IndexBase):
             if not os.path.exists(os.path.dirname(self.index_file)):
                 os.makedirs(os.path.dirname(self.index_file))
             
+            # Crear el archivo del índice vacío si no existe
+            if not os.path.exists(self.index_file):
+                with open(self.index_file, 'wb') as f:
+                    pass  # Crear archivo vacío
+            
+            
             root = Node(is_leaf=True)
             root.page_id = self._allocate_page()
             self.root_page_id = root.page_id

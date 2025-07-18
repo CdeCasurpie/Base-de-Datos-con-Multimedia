@@ -47,7 +47,19 @@ def run_server(host='0.0.0.0', port=54321):
                 if not data:
                     continue
                 try:
-                    result = db.execute_query(data)
+                    # Detectar si es una solicitud get_len
+                    if data.strip().startswith('get_len(') and data.strip().endswith(')'):
+                        # Extraer el nombre de la tabla de get_len(table_name)
+                        table_name = data.strip()[8:-1].strip().strip('"').strip("'")
+                        count = db.get_record_count(table_name)
+                        if count is not None:
+                            result = (count, None)
+                        else:
+                            result = (None, f"Tabla '{table_name}' no encontrada")
+                    else:
+                        # Ejecutar consulta SQL normal
+                        result = db.execute_query(data)
+                    
                     # Convertir bytes a string antes de serializar
                     clean_result = convert_bytes_to_string(result)
                     response = json.dumps({"status": "ok", "result": clean_result}, default=json_serializer)

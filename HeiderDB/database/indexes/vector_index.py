@@ -115,6 +115,7 @@ class VectorIndex:
             raise ValueError("No se pudieron extraer descriptores de ningún archivo")
         
         print(f"Total descriptores extraídos: {len(all_descriptors)}")
+
         
         # Convertir a matriz numpy para K-means
         descriptors_matrix = np.vstack(all_descriptors)

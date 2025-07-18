@@ -298,54 +298,6 @@ class Table:
                     results.append(record)
         return results
 
-    def add(self, record):
-        # Validate record structure
-        for col_name in self.columns:
-            if col_name not in record:
-                raise ValueError(f"Missing column {col_name} in record")
-
-        # Check if primary key already exists
-        primary_key_value = record[self.primary_key]
-        existing_record = self.index.search(primary_key_value)
-
-        if existing_record:
-            raise ValueError(
-                f"Record with primary key {primary_key_value} already exists"
-            )
-
-        # Add the record to the index
-        self.index.add(record, primary_key_value)
-
-        # Serialize the record
-        for column, spatial_index in self.spatial_indexes.items():
-            if column in record:
-                try:
-                    spatial_index.add(record, primary_key_value)
-                except Exception as e:
-                    print(f"Error adding spatial index for {column}: {e}")
-
-        for column, text_index in getattr(self, "text_indexes", {}).items():
-            if column in record:
-                try:
-                    text_index.add(record, primary_key_value)
-                except Exception as e:
-                    print(f"Error adding text index for {column}: {e}")
-
-        for column, multimedia_index in self.indexes.items():
-            if column in record:
-                try:
-                    multimedia_index.add(record, primary_key_value)
-                except Exception as e:
-                    print(f"Error adding multimedia index for {column}: {e}")
-
-        # Update record count
-        self.record_count += 1
-
-        # Save metadata
-        self._save_metadata()
-
-        return True
-
     def remove(self, column, value):
         """
         Elimina un registro de la tabla.

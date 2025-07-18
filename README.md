@@ -67,7 +67,7 @@ La estructura interna mantiene para cada término un mapeo hacia los documentos 
 
 #### 2.2.2 Índice Multimedia
 
-El sistema multimedia funciona como una cadena de procesamiento inteligente que convierte contenido multimedia en representaciones matemáticas que la computadora puede comparar. Todo comienza con los extractores de características: para imágenes usamos redes convolucionales pre-entrenadas como ResNet o VGG que han aprendido a reconocer patrones visuales, mientras que para audio extraemos características espectrales y coeficientes MFCC que capturan la esencia sonora del contenido.
+El sistema multimedia funciona como una cadena de procesamiento inteligente que convierte contenido multimedia en representaciones matemáticas que la computadora puede comparar. Cuando se agrega un nuevo archivo. Por ejemplo, una imagen, primero se pasa por el MultimediaStorage, que calcula su hash MD5 en base al contenido y lo guarda en una carpeta llamada multimedia, evitando duplicados. Luego, el FeatureExtractor aplica el algoritmo SIFT para imágenes, extrayendo keypoints y descriptores locales, mientras que para audios utiliza MFCC para obtener representaciones acústicas. Las características extraídas se almacenan en el VectorIndex, que organiza los vectores para permitir búsquedas por similitud usando el algoritmo KNN. Finalmente, se mantiene un archivo JSON que mapea las claves internas con las rutas de los archivos originales, facilitando su recuperación al encontrar coincidencias.
 
 Estos extractores alimentan al VectorIndex, que almacena las representaciones vectoriales de alta dimensionalidad y implementa algoritmos de búsqueda de k-vecinos más cercanos usando métricas como distancia coseno o euclidiana. El MultimediaStore complementa esto manteniendo un mapeo eficiente hacia los archivos reales sin duplicar datos, junto con metadatos importantes como resolución, duración y formato.
 
@@ -309,14 +309,12 @@ posting_list_structure = {
 }
 ```
 
-#### 3.5.2 Algoritmo SPIMI Adaptado
+#### 3.5.2 Algoritmo Add
 
 Implementamos una versión adaptada del algoritmo **Single-Pass In-Memory Indexing (SPIMI)** que maneja eficientemente la construcción incremental:
 
 ```python
 def add(self, record, key):
-    """Algoritmo SPIMI para construcción incremental del índice"""
-    
     # 1. Procesamiento de texto y extracción de términos
     text = record[self.column_name]
     terms = self.text_processor.process_text(text)

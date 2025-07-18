@@ -1206,6 +1206,22 @@ class Database:
         except Exception as e:
             return False, f"Error eliminando registro: {e}"
 
+    def get_record_count(self, table_name):
+        """
+        Obtiene la cantidad de registros en una tabla específica.
+
+        Params:
+            table_name (str): Nombre de la tabla.
+
+        Returns:
+            int: Número de registros en la tabla, o None si la tabla no existe.
+        """
+        if table_name not in self.tables:
+            return None
+
+        table = self.tables[table_name]
+        return table.get_record_count()
+
     def get_table_info(self, table_name):
         """
         Obtiene información detallada de una tabla.

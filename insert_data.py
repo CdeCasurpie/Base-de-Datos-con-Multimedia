@@ -18,7 +18,7 @@ from HeiderDB.client import HeiderClient
 
 def get_files_from_directory(directory, extensions):
     """
-    Obtiene todos los archivos con las extensiones especificadas de un directorio.
+    Obtiene todos los archivos con las extensiones especificadas de un directorio y todas sus subcarpetas recursivamente.
     
     Args:
         directory (str): Ruta del directorio
@@ -29,12 +29,14 @@ def get_files_from_directory(directory, extensions):
     """
     files = []
     if os.path.exists(directory):
-        for file in os.listdir(directory):
-            file_path = os.path.join(directory, file)
-            if os.path.isfile(file_path):
-                _, ext = os.path.splitext(file)
-                if ext.lower() in extensions:
-                    files.append(file_path)
+        # Usar os.walk para recorrer recursivamente todas las subcarpetas
+        for root, dirs, filenames in os.walk(directory):
+            for filename in filenames:
+                file_path = os.path.join(root, filename)
+                if os.path.isfile(file_path):
+                    _, ext = os.path.splitext(filename)
+                    if ext.lower() in extensions:
+                        files.append(file_path)
     return files
 
 
@@ -59,7 +61,7 @@ def create_and_populate_tables():
     client = HeiderClient()
     
     # Directorios de archivos multimedia
-    images_dir = "./HeiderDB/test_images"
+    images_dir = "./HeiderDB/images_dataset"
     audios_dir = "./HeiderDB/test_audios"
     
     # Datasets de entrenamiento

@@ -122,3 +122,8 @@ images_app/images
 images_app/static/images
 images_app/static/images/*
 images_app/temp_uploads
+
+
+audio_app/static/songs/*
+audio_app/static/songs
+audio_app/static/songs/

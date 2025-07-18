@@ -121,7 +121,7 @@ def health_check():
 @app.route("/api/test-db", methods=["GET"])
 def test_database():
     try:
-        response = db_client.send_query("SELECT * FROM imagenes;")
+        response = db_client.send_query("SELECT * FROM usuarios;")
         return jsonify(response)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -257,7 +257,7 @@ def serve_index():
 @app.route("/api/list-images", methods=["GET"])
 def list_all_images():
     try:
-        response = db_client.send_query("SELECT * FROM imagenes;")
+        response = db_client.send_query("SELECT * FROM imagenes WHERE id=1;")
         return jsonify(response)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -301,27 +301,19 @@ def register_user():
 
         absolute_temp_path = os.path.abspath(temp_path)
 
-        count_query = "SELECT * FROM imagenes;"
-        count_response = db_client.send_query(count_query)
+        # Usar get_len para obtener la cantidad de registros de manera eficiente
+        count_response = db_client.send_query("get_len(imagenes)")
 
         next_id = 1
         if count_response.get("status") == "ok":
             result = count_response.get("result", [])
-            if (
-                result
-                and len(result) >= 2
-                and result[0]
-                and isinstance(result[0], list)
-            ):
-                next_id = len(result[0]) + 1
+            if result and len(result) >= 2 and result[0] is not None:
+                next_id = result[0] + 1
 
         insert_query = f"INSERT INTO imagenes VALUES ({next_id}, '{name}', '{absolute_temp_path}');"
         db_response = db_client.send_query(insert_query)
 
         if db_response.get("status") == "ok":
-            multimedia_index_query = f"CREATE MULTIMEDIA INDEX idx_image_sift ON imagenes (archivo) WITH TYPE image METHOD sift;"
-            index_response = db_client.send_query(multimedia_index_query)
-            print(f"Índice multimedia: {index_response}")
 
             from datetime import datetime
 
@@ -359,14 +351,13 @@ def register_user():
 @app.route("/user_statistics/<username>", methods=["GET"])
 def user_statistics(username):
     try:
-        total_query = "SELECT * FROM imagenes;"
+        total_query = "get_len(imagenes);"
         total_response = db_client.send_query(total_query)
 
-        total_images = 0
-        if total_response.get("status") == "ok":
-            result = total_response.get("result", [])
-            if result and len(result) >= 2 and result[0]:
-                total_images = len(result[0]) if isinstance(result[0], list) else 0
+        if total_response.get("status") != "ok":
+            return jsonify({"error": "Error obteniendo estadísticas de la base de datos"}), 500
+
+        total_images = total_response.get("result", [0])[0]
 
         user_query = f"SELECT * FROM imagenes WHERE nombre = '{username}';"
         user_response = db_client.send_query(user_query)
@@ -423,16 +414,15 @@ def user_statistics(username):
 @app.route("/analyze_database", methods=["POST"])
 def analyze_database():
     try:
-        response = db_client.send_query("SELECT * FROM imagenes;")
+        response = db_client.send_query("get_len(imagenes);")
 
         if response.get("status") == "ok":
             result = response.get("result", [])
-            if result and len(result) >= 2:
-                data = result[0]
-                count = len(data) if data and isinstance(data, list) else 0
+            if result and len(result) >= 2 and result[0] is not None:
+                count = result[0]
             else:
                 count = 0
-
+                
             return jsonify(
                 {
                     "status": "success",
@@ -441,9 +431,10 @@ def analyze_database():
                     "total_images": count,
                 }
             )
+        
         else:
+        
             return jsonify({"error": "Error analizando base de datos"}), 500
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -451,13 +442,12 @@ def analyze_database():
 @app.route("/database_info", methods=["GET"])
 def database_info():
     try:
-        response = db_client.send_query("SELECT * FROM imagenes;")
+        response = db_client.send_query("get_len(imagenes);")
 
         if response.get("status") == "ok":
             result = response.get("result", [])
-            if result and len(result) >= 2:
-                data = result[0]
-                count = len(data) if data and isinstance(data, list) else 0
+            if result and len(result) >= 2 and result[0] is not None:
+                count = result[0]
             else:
                 count = 0
 
@@ -528,12 +518,7 @@ def who_do_i_look_like():
             or not db_response.get("result")[0]
         ):
             print("SIMILAR TO falló, usando búsqueda alternativa...")
-            all_query = f"SELECT * FROM imagenes WHERE nombre != '{username}' LIMIT 15;"
-            db_response = db_client.send_query(all_query)
-
-            if db_response.get("status") != "ok":
-                print(f"Error en búsqueda alternativa: {db_response}")
-                return jsonify({"error": "Error buscando similitudes"}), 500
+            return jsonify({"error": "Error buscando similitudes"}), 500
 
         results = db_response.get("result", [])
         if not results or len(results) < 1 or not results[0]:
@@ -572,26 +557,7 @@ def who_do_i_look_like():
 
                 similarity_score = float(image_data.get("_similarity_score", 0.0))
 
-                if similarity_score == 0.0:
-                    similarity_percentage = 70.0
-                elif similarity_score > 1.0:
-                    if similarity_score > 15:
-                        similarity_percentage = max(60, 95 - (similarity_score * 2))
-                    elif similarity_score > 8:
-                        similarity_percentage = max(70, 98 - (similarity_score * 2.5))
-                    elif similarity_score > 3:
-                        similarity_percentage = max(78, 100 - (similarity_score * 3.5))
-                    else:
-                        similarity_percentage = max(85, 100 - (similarity_score * 4))
-                else:
-                    if similarity_score > 0.8:
-                        similarity_percentage = 92 + (similarity_score * 5)
-                    elif similarity_score > 0.5:
-                        similarity_percentage = 80 + (similarity_score * 15)
-                    else:
-                        similarity_percentage = 65 + (similarity_score * 25)
-
-                similarity_percentage = max(60, min(similarity_percentage, 97))
+                similarity_percentage = similarity_score * 100
 
                 print(f"DEBUG: Usuario {name} calculado: {similarity_percentage}%")
 
@@ -647,94 +613,16 @@ def who_do_i_look_like():
         similarities.sort(key=lambda x: x["similarity_percentage"], reverse=True)
         top_similarities = similarities[:top_n]
 
-        if len(top_similarities) < top_n:
-            print(
-                f"Solo se encontraron {len(top_similarities)} similitudes, completando hasta {top_n}..."
-            )
-
-            all_users_query = (
-                f"SELECT * FROM imagenes WHERE nombre != '{username}' LIMIT 20;"
-            )
-            all_users_response = db_client.send_query(all_users_query)
-
-            if all_users_response.get("status") == "ok":
-                all_results = all_users_response.get("result", [])
-                if all_results and all_results[0]:
-                    all_records = (
-                        all_results[0]
-                        if isinstance(all_results[0], list)
-                        else [all_results[0]]
-                    )
-
-                    remaining_needed = top_n - len(top_similarities)
-                    for record in all_records:
-                        if remaining_needed <= 0:
-                            break
-
-                        if isinstance(record, dict):
-                            name = record.get("nombre", "")
-                            if name != username and name not in processed_users:
-                                original_path = record.get("archivo", "")
-                                if isinstance(original_path, bytes):
-                                    original_path = original_path.decode(
-                                        "utf-8"
-                                    ).rstrip("\x00")
-
-                                web_path = copy_image_to_static(original_path, record)
-                                if web_path:
-                                    user_score = record.get("_similarity_score", None)
-                                    if user_score is not None:
-                                        score = float(user_score)
-                                        print(
-                                            f"DEBUG: Fallback usuario {name} score real: {score}"
-                                        )
-                                        if score > 1.0:
-                                            similarity_percentage = max(
-                                                65, 95 - (score * 2)
-                                            )
-                                        else:
-                                            similarity_percentage = score * 25 + 70
-                                    else:
-                                        import random
-
-                                        base_score = 85 - (remaining_needed * 4)
-                                        similarity_percentage = (
-                                            base_score + random.uniform(-5, 8)
-                                        )
-                                        print(
-                                            f"DEBUG: Fallback usuario {name} sin score, generado: {similarity_percentage}%"
-                                        )
-
-                                    similarity_percentage = max(
-                                        65, min(similarity_percentage, 95)
-                                    )
-
-                                    if similarity_percentage >= 70:
-                                        confidence = "high"
-                                    elif similarity_percentage >= 50:
-                                        confidence = "medium"
-                                    else:
-                                        confidence = "low"
-
-                                    similarity = {
-                                        "name": name,
-                                        "similarity": similarity_percentage / 100.0,
-                                        "similarity_percentage": round(
-                                            similarity_percentage, 1
-                                        ),
-                                        "image_path": web_path,
-                                        "image_base64": (
-                                            f"data:image/jpeg;base64,{_get_image_base64(original_path)}"
-                                            if os.path.exists(original_path)
-                                            else None
-                                        ),
-                                        "confidence": confidence,
-                                    }
-                                    top_similarities.append(similarity)
-                                    processed_users.add(name)
-                                    remaining_needed -= 1
-
-        top_similarities.sort(key=lambda x: x["similarity_percentage"], reverse=True)
+        try:
+            top_similarities.sort(key=lambda x: x["similarity_percentage"], reverse=True)
+        except Exception as e:
+            print(f"Error sorting top similarities: {e}") 
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "Error al ordenar similitudes",
+                }
+            ), 500
 
         return jsonify(
             {
@@ -762,39 +650,6 @@ if __name__ == "__main__":
     print("  GET  /api/list-images - Listar todas las imágenes")
     print("  GET  /static/images/<filename> - Servir archivos de imagen")
     print()
-
-    try:
-        print("Verificando índice multimedia...")
-        multimedia_index_query = "CREATE MULTIMEDIA INDEX idx_image_sift ON imagenes (archivo) WITH TYPE image METHOD sift;"
-        index_response = db_client.send_query(multimedia_index_query)
-        print(f"Índice multimedia: {index_response}")
-
-        test_response = db_client.send_query("SELECT * FROM imagenes;")
-        if test_response.get("status") == "ok":
-            result = test_response.get("result", [])
-            if result and len(result) >= 2:
-                data = result[0]
-                message = result[1]
-                if data is not None and isinstance(data, list):
-                    count = len(data)
-                    print(f"Conexión con HeiderDB establecida. Imágenes en BD: {count}")
-                    print(
-                        "Índice multimedia SIFT configurado y listo para extraer características"
-                    )
-                else:
-                    print(f"Conexión con HeiderDB establecida. Mensaje: {message}")
-            else:
-                print(
-                    "Conexión con HeiderDB establecida, pero estructura de respuesta inesperada"
-                )
-        else:
-            print(
-                "Error conectando con HeiderDB:",
-                test_response.get("message", "Respuesta inválida"),
-            )
-    except Exception as e:
-        print("No se pudo conectar con HeiderDB:", e)
-        print("   Asegúrate de que el servidor de BD esté ejecutándose")
 
     print()
     print("Iniciando servidor Flask...")
